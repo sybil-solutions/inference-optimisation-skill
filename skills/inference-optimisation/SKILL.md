@@ -33,7 +33,11 @@ Detailed references, read when needed:
 - `references/levers.md`: levers by area, ordered by typical payoff, with measured evidence.
 - `references/gotchas.md`: engine- and hardware-specific traps.
 - `references/publishing.md`: qualification gates, pinning, poster and report.
-- `scripts/`: an engine-agnostic harness. It has a bench, ceiling calculator, memory watchdog, serialized queue and ledger.
+- `scripts/`: an engine-agnostic harness (standard-library Python + bash, tested in CI against a fake server):
+  - `bench.py run | soak | greedy | equiv | compare | show`: benchmark, full-KV soak, greedy capture and equivalence, the accept/reject rule, the ledger table;
+  - `ceiling.py`: theoretical ceilings (`--target N` checks a user goal, `--json` for `THEORY.md`);
+  - `queue.sh`: serialized, locked run queue with unique run ids;
+  - `mem.sh`: real memory footprint (container or `--pid`), including unified-memory driver residency.
 
 ## 0. Before touching anything
 
@@ -83,9 +87,10 @@ Report progress as a percentage of the practical ceiling. If the user's target i
    - Run controls on both sides of each candidate: control, candidate, control.
    - Accept only if the candidate beats both neighbouring controls on its target metric and regresses nothing by more than ~3%.
    - Repeat any single surprising win.
+   - Mechanically: `queue.sh ctl cand ctl`, then `bench.py compare --control ctl`. It applies this rule and a bootstrap 95% CI on the c1 samples: ACCEPT, REPEAT (CI includes no change), REJECT or VOID.
 3. **Keep the environment fixed.** Stay on AC power, on a fixed performance profile, with an idle host and no other GPU jobs.
-   - Make the harness refuse to run otherwise.
-   - Record the state at the end of each run, and void the run if it changed.
+   - Make the harness refuse to run otherwise (`require_ac`, `require_profile`, `max_load` in the config).
+   - Record the state at the end of each run, and void the run if it changed (`bench.py` flags `ENV_CHANGED`).
    - Restore any profile you changed when you finish, and tell the user.
 4. **Run one GPU job at a time.** Serialize them with a lock (`scripts/queue.sh`).
    - Never use `pkill -f`/`pgrep -f` patterns that can match your own shell.
@@ -93,11 +98,11 @@ Report progress as a percentage of the practical ceiling. If the user's target i
 5. **Enforce the memory cap with a watchdog** that kills the run.
    - On unified memory, GPU allocations do not show in cgroup counters or MemAvailable. Measure driver residency (e.g. `drm-resident-*` in `/proc/<pid>/fdinfo`, `nvidia-smi`, or `ioreg`/`vm_stat` on Apple) plus process anonymous memory.
 6. **Stability gates.** A config is only "best" after it passes:
-   - a long-context retrieval run, with needles in a ~50% then ~100% context document, found exactly;
-   - a soak with concurrent full-length requests, if the KV pool is sized for N users;
-   - a greedy output equivalence check, if the change claims to be lossless.
+   - a long-context retrieval run, with needles in a ~50% then ~100% context document, found exactly (`bench.py run --long N`);
+   - a soak with concurrent full-length requests, if the KV pool is sized for N users (`bench.py soak --n N --tokens CTX`);
+   - a greedy output equivalence check, if the change claims to be lossless (`bench.py greedy` on both configs, then `bench.py equiv`).
 7. **Never force-kill a server mid-batch.** Abort requests, wait for the drain, then stop with a timeout. A forced stop mid-prefill has caused GPU driver faults.
-8. **Verify outputs, not just speed.** Flag degenerate or looping output, failed requests and an idle GPU. A suspiciously fast result is usually broken output.
+8. **Verify outputs, not just speed.** Flag degenerate or looping output, failed requests and an idle GPU. A suspiciously fast result is usually broken output. `bench.py` voids runs with `LOOP`, `NO_USAGE`, `REQ_FAIL`, `MEM_CAP`, `NEEDLE_MISS`, and warns on `NOT_CONCURRENT`, `GPU_IDLE` (with `gpu_busy_probe`) and `SHORT_OUTPUT`.
 9. **Log everything in `PLAN.md`,** including failures and why they failed. Negative results are the most reusable output.
 10. **Secrets:** never ask twice for a credential the user already saved. Never print it, and never copy it or its path into anything published.
 
