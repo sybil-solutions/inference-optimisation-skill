@@ -25,18 +25,18 @@ You are optimising the serving speed of a local LLM on this machine. Use the `in
 1. **Set up and measure.**
    - Set up the experiment directory: `PLAN.md`, `THEORY.md`, `configs/`, `ledger.jsonl`, `best-config.json`.
    - Inventory the machine, and measure real bandwidth and matmul throughput.
-   - Compute the ceilings with `scripts/ceiling.py` and write them to `THEORY.md`.
+   - Compute the ceilings with `scripts/ceiling.py` (add `--target <stretch goal>`) and write them to `THEORY.md`.
    - Measure the baseline with `scripts/bench.py`.
 2. **Loop:**
    - Pick the lever with the biggest expected gain, using the lever order in `SKILL.md` and the evidence in `references/levers.md`.
    - Make exactly one change in a new config.
    - Run it between two controls with `scripts/queue.sh ctl cand ctl`.
-   - Accept or reject it, and log the numbers and the reason in `PLAN.md`.
+   - Get the verdict with `scripts/bench.py compare --control ctl` (ACCEPT / REPEAT / REJECT / VOID), and log the numbers and the reason in `PLAN.md`. Re-run anything marked REPEAT before believing it.
    - Never rerun something `PLAN.md` already rejected without a new reason.
 3. **Gate every new best:**
-   - long-context needle retrieval at ~50%, then ~100% of the context;
-   - a concurrent full-length soak if the KV pool is sized for N users;
-   - a greedy equivalence check for changes claimed to be lossless.
+   - long-context needle retrieval at ~50%, then ~100% of the context (`bench.py run --long N`);
+   - a concurrent full-length soak if the KV pool is sized for N users (`bench.py soak --n N --tokens CTX`);
+   - a greedy equivalence check for changes claimed to be lossless (`bench.py greedy`, then `bench.py equiv`).
 4. **Safety, always:**
    - one GPU job at a time;
    - an AC power and performance-profile guard;

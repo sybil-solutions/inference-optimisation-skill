@@ -20,7 +20,7 @@ Most "wins" and "regressions" in inference tuning are measurement errors. In eve
   - prompt content, because acceptance depends on text type.
 - Take ≥6 decode samples and use the median. Use a fixed, seeded prompt panel; random prompts moved acceptance from 2.4 to 3.7 and made c1 comparisons pure noise.
 - **Interleave runs:** control, candidate, control. Compare a candidate only with its neighbours. Drift over an hour can exceed the effect you are measuring: the same config measured 53.8 and then 49.5 an hour apart.
-- **When comparing engines,** run them on the same card on the same day, back to back. Accept "B is faster" only if a bootstrap 95% CI of median(B)/median(A) is above 1.0.
+- **When comparing engines,** run them on the same card on the same day, back to back. Accept "B is faster" only if a bootstrap 95% CI of median(B)/median(A) is above 1.0. `bench.py compare` computes this CI from the per-sample `c1_all` values.
 - Discard cold first runs and the first boot after a JIT cache miss (36 vs 90 tok/s on one vLLM boot).
 - Microbenchmarks need interleaved min-of-N timing; clock ramp-up made one kernel look 2.5× slower than it was.
 

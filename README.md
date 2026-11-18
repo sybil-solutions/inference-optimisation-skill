@@ -86,18 +86,18 @@ The skill has three parts:
 - [`gotchas.md`](skills/inference-optimisation/references/gotchas.md): known traps in vLLM, SGLang, llama.cpp and ExLlama, and on Intel, NVIDIA, Apple and AMD hardware.
 - [`publishing.md`](skills/inference-optimisation/references/publishing.md): pinning, clean builds, the six acceptance gates, proving the build matches the best, results cards.
 
-**[`scripts/`](skills/inference-optimisation/scripts): a small, engine-agnostic harness.** It is standard-library Python plus bash.
-- `bench.py` benchmarks any OpenAI-compatible server. It measures:
-  - startup and short-prompt TTFT;
-  - c1 decode (median of N) and cN aggregate decode;
-  - cold prefill at several lengths;
-  - long-context needle retrieval;
-  - peak memory, with a cap watchdog.
+**[`scripts/`](skills/inference-optimisation/scripts): a small, engine-agnostic harness.** It is standard-library Python plus bash, covered by tests in CI.
+- `bench.py` benchmarks any OpenAI-compatible server.
+  - `run` measures startup and short-prompt TTFT; c1 decode (median of N) and cN aggregate decode; cold prefill at several lengths; long-context needle retrieval; peak memory, with a cap watchdog.
+  - `soak` sends N concurrent full-length needle requests to prove the KV pool really holds N × context.
+  - `greedy` + `equiv` capture greedy outputs on two configs and show where they diverge.
+  - `compare` applies the accept rule mechanically: a candidate must beat **both** neighbouring controls, regress nothing by more than 3%, and (for c1) have a bootstrap 95% CI of the median ratio above 1. Verdicts: ACCEPT, REPEAT, REJECT, VOID.
+  - `show` prints the ledger.
 
-  It flags looping output, failed requests and runs on battery. Token counts come from server usage stats, never from streamed chunks, and everything lands in `ledger.jsonl`.
-- `ceiling.py` computes the theoretical ceilings from a JSON of measured bandwidth and FLOPs plus component sizes.
-- `queue.sh` is a serialized, detachable run queue, for interleaving control/candidate/control runs.
-- `mem.sh` reports a container's real footprint. That includes driver residency on unified-memory GPUs, which cgroups don't see.
+  Token counts come from server usage stats, never from streamed chunks. Runs are **voided** for looping output, missing usage stats, failed requests, a tripped memory cap, missed needles, battery power, or a power-profile change during the run; they are **flagged** when the N streams did not really overlap, the GPU was idle, or outputs were too short. The harness can refuse to start unless the power profile and host load match the config. Every run gets a unique `run_id`, a config hash and an environment snapshot in `ledger.jsonl`.
+- `ceiling.py` computes the theoretical ceilings from a JSON of measured bandwidth and FLOPs plus component sizes. `--target N` says whether a goal is physically reachable; `--json` emits machine-readable output; optional `memory_cap_gb`/`resident_gb` add a "streams that fit" table.
+- `queue.sh` is a serialized, detachable run queue for control/candidate/control runs. Each invocation is a group with positions, so `compare` knows which controls neighbour which candidate; no log is ever overwritten.
+- `mem.sh` reports the real footprint of a container or of bare-metal PIDs (`--pid`), including driver residency on unified-memory GPUs, which cgroups don't see. Units printed by the kernel (B/KiB/MiB) are parsed per line; cgroup v1 and v2 are both supported.
 
 ## Install
 
@@ -120,12 +120,23 @@ Other agents: point them at `skills/inference-optimisation/SKILL.md`, or paste [
 
 ```bash
 S=skills/inference-optimisation
-python3 $S/scripts/ceiling.py $S/examples/ceiling-ornith-b390.json        # ceilings
+python3 $S/scripts/ceiling.py $S/examples/ceiling-ornith-b390.json --target 100   # ceilings + goal check
 mkdir -p configs && cp $S/examples/config-existing-server.json configs/base.json   # edit base_url/model
 python3 $S/scripts/bench.py run configs/base.json --long 131072            # one run
 bash $S/scripts/queue.sh base cand base                                     # interleaved A/B
+python3 $S/scripts/bench.py compare --control base                          # ACCEPT / REPEAT / REJECT / VOID
+python3 $S/scripts/bench.py soak configs/cand.json --n 4 --tokens 262144    # full-KV stability gate
 python3 $S/scripts/bench.py show                                            # ledger table
 ```
+
+## Tests
+
+```bash
+python3 -m unittest discover -s tests -v     # unit tests + end-to-end runs against a fake streaming server
+shellcheck skills/inference-optimisation/scripts/*.sh
+```
+
+The fake server (`tests/fake_server.py`) can loop, omit usage stats or serialise requests, so every flag and verdict path is exercised without a GPU.
 
 ## Principles that carried the most weight
 

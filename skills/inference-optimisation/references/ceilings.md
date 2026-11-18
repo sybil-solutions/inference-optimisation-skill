@@ -25,7 +25,7 @@ bytes_per_emitted_token = (verify_bytes + draft_bytes) / a
 c1_ceiling = measured_bandwidth / bytes_per_emitted_token
 ```
 
-For a concurrency of N, dense weights are read once per step for all streams; experts follow the union of all rows' routing; KV is per stream. The aggregate ceiling therefore grows almost linearly with N until the expert union and per-stream KV dominate the bytes.
+For a concurrency of N, dense weights, the LM head and the draft's weights are read once per step for all streams; experts follow the union of all rows' routing; KV and recurrent state are per stream. The step emits `a × N` tokens, so `aggregate = bandwidth × a × N / step_bytes`. Sanity check: the aggregate can never exceed N × the single-user ceiling. The aggregate ceiling therefore grows almost linearly with N until the expert union and per-stream KV dominate the bytes.
 
 ## Prefill (compute bound)
 
@@ -76,4 +76,4 @@ The pruned draft head, about 8× fewer head bytes, was worth more than an extra 
 - **Prefill:** about 670 tok/s practical at 256K versus 628 achieved. Long-context prefill was close to its ceiling.
 - **KV cache:** FP8 KV is 10,240 B/token, so 2.7 GB per 256K stream. Four full-length streams fit in about 11 GB under a 46 GiB cap.
 
-`scripts/ceiling.py` does this arithmetic from a small JSON of component sizes.
+`scripts/ceiling.py` does this arithmetic from a small JSON of component sizes. For the same model at 4 users and 4K context it gives ~142 tok/s aggregate without speculation; the measured 103 tok/s is ~73% of that.
