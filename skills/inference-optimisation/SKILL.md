@@ -95,7 +95,8 @@ Report progress as a percentage of the practical ceiling. If the user's target i
 6. **Stability gates.** A config is only "best" after it passes:
    - a long-context retrieval run, with needles in a ~50% then ~100% context document, found exactly;
    - a soak with concurrent full-length requests, if the KV pool is sized for N users;
-   - a greedy output equivalence check, if the change claims to be lossless.
+   - a greedy output equivalence check, if the change claims to be lossless;
+   - an agent-task check, if the change is a lossy trade (lower bpw, int8/fp8 GEMMs, KV dtype, draft vocab pruning): run a short code-graded agent test through a harness driven by the tuned server, at least three times before and after, and keep the change only if the pass count holds beyond run-to-run noise (about 3 challenges out of 15). Report its end-to-end wall time next to tok/s; it is the speed the user actually feels. One option is the airbench.ai quick test (15 challenges, self-registered key, no account): see `references/publishing.md`.
 7. **Never force-kill a server mid-batch.** Abort requests, wait for the drain, then stop with a timeout. A forced stop mid-prefill has caused GPU driver faults.
 8. **Verify outputs, not just speed.** Flag degenerate or looping output, failed requests and an idle GPU. A suspiciously fast result is usually broken output.
 9. **Log everything in `PLAN.md`,** including failures and why they failed. Negative results are the most reusable output.
