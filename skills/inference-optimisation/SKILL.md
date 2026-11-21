@@ -11,7 +11,8 @@ description: >
   a model server (vLLM, SGLang, llama.cpp, ExLlama/TabbyAPI, MLX, TensorRT-LLM...),
   to find the maximum possible tok/s on a machine, or to publish a tuned recipe.
   Triggers: hill climb, tok/s, decode speed, prefill speed, MTP, EAGLE, draft model,
-  speculative decoding, KV cache, TTFT, startup time, theoretical maximum.
+  speculative decoding, KV cache, TTFT, startup time, theoretical maximum,
+  tensor parallel, NCCL, multi-node.
 ---
 
 # Inference optimisation (hill-climbing a model server)
@@ -30,6 +31,7 @@ Detailed references, read when needed:
 
 - `references/ceilings.md`: how to compute theoretical maxima. It includes a worked example.
 - `references/methodology.md`: measurement pitfalls and statistics.
+- `references/multinode.md`: only when a model is split over several GPUs or hosts. Fabric checks, communication time, and the levers and traps of the links between ranks.
 - `references/levers.md`: levers by area, ordered by typical payoff, with measured evidence.
 - `references/gotchas.md`: engine- and hardware-specific traps.
 - `references/publishing.md`: qualification gates, pinning, poster and report.
@@ -44,7 +46,8 @@ Detailed references, read when needed:
   - Which quality changes are allowed: lossless only, or labelled lossy trades such as int8 prefill.
 - **Inventory the machine:**
   - accelerator, memory type and size, and whether memory is unified;
-  - driver, engine version, model, quantization, current launch command.
+  - driver, engine version, model, quantization, current launch command;
+  - if the model is split over GPUs or hosts: the layout, the links between ranks, and the fabric checks in `references/multinode.md`.
 - **Measure, don't trust spec sheets:**
   - real memory bandwidth (device copy);
   - real matmul throughput (large GEMM);
