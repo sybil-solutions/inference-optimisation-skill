@@ -5,7 +5,7 @@ Most "wins" and "regressions" in inference tuning are measurement errors. In eve
 ## Counting
 
 - **Count tokens with the tokenizer or the server's usage stats, not streamed chunks.** With speculative decoding, engines emit several tokens per SSE chunk; counting chunks under-reported MTP decode. Use `stream_options: {include_usage: true}` or `continuous_usage_stats`, or re-tokenize the output.
-- **Size prompts with the real tokenizer.** "Random word" documents were ~3.5 tokens per word, not ~1.3–1.9, so nominal "32K/128K" cells were really 58K/232K.
+- **Size prompts with the real tokenizer.** "Random word" documents were ~3.5 tokens per word, not ~1.3–1.9, so nominal "32K/128K" cells were really 58K/232K. The error goes the other way too: on a Llama-3 tokenizer `bench.py`'s filler words are ~1.05 tokens each, so a fixed 1.6 guess made a nominal 1,024-token prompt 776 tokens and `--long N` about two-thirds of N. `bench.py` now fits tokens per word on the live server before sizing documents (`tokens_per_word` in the ledger); check `prompt_tokens` anyway.
 - **Build prompts before the clock starts.** Make them unique per run, with a random prefix, so prefix caching cannot hit, unless you are measuring cache hits deliberately.
 - **Decode tok/s:** completion tokens after the first token ÷ time since the first token.
 - **Prefill tok/s:** prompt tokens ÷ TTFT on a cold, unique prompt. Report cold and warm (cache-hit) separately; never publish a cache-hit prefill as prefill.
@@ -19,6 +19,7 @@ Most "wins" and "regressions" in inference tuning are measurement errors. In eve
   - background CPU load (a laptop RTX 4080 went 107 → 75 tok/s under light CPU load);
   - prompt content, because acceptance depends on text type.
 - Take ≥6 decode samples and use the median. Use a fixed, seeded prompt panel; random prompts moved acceptance from 2.4 to 3.7 and made c1 comparisons pure noise.
+- **Measure the noise floor with an A/A series.** Run the unchanged control ≥10 times back to back, then `scripts/aa.py`. The middle run of any three identical runs is the fastest about one time in three. In 45 identical runs (llama.cpp, Apple M4 Max, a 3.8B Q4_K_M model), 15 of 43 middle runs beat both neighbours; the largest such win over the better neighbour was 1.5%, and requiring a 2% margin removed all 15. See `results/aa-noise-floor-apple-m4-max/`.
 - **Interleave runs:** control, candidate, control. Compare a candidate only with its neighbours. Drift over an hour can exceed the effect you are measuring: the same config measured 53.8 and then 49.5 an hour apart.
 - **When comparing engines,** run them on the same card on the same day, back to back. Accept "B is faster" only if a bootstrap 95% CI of median(B)/median(A) is above 1.0.
 - Discard cold first runs and the first boot after a JIT cache miss (36 vs 90 tok/s on one vLLM boot).
