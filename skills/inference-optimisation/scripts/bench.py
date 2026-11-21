@@ -31,6 +31,8 @@ import json, os, random, statistics, string, subprocess, sys, threading, time, u
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+MIN_DECODE_WINDOW = 0.05   # seconds; below this a decode rate is unmeasurable, not fast
+
 PROMPTS = [  # fixed panel: acceptance and speed depend on content, so never randomise these
     "Write a Python implementation of an LRU cache with O(1) get and put, with docstrings and tests.",
     "Explain, step by step, how TCP congestion control works, including slow start and fast recovery.",
@@ -92,9 +94,34 @@ class Server:
         ct, pt = usage.get("completion_tokens"), usage.get("prompt_tokens")
         if t_first is None:
             t_first = t_end
-        decode = (ct - 1) / (t_end - t_first) if ct and ct > 1 and t_end > t_first else None
+        window = t_end - t_first
+        # Guard the denominator. A broken config can emit its whole response as repeated
+        # tokens that the server coalesces into ONE streamed chunk: the window then collapses
+        # to microseconds while completion_tokens is still 64, so ct/window reports
+        # 863,388 tok/s on hardware whose real decode is 20 tok/s. Such a sample is not fast,
+        # it is unmeasurable — report None and let the caller flag it.
+        coalesced = bool(ct and ct > 1 and window < MIN_DECODE_WINDOW)
+        decode = (ct - 1) / window if ct and ct > 1 and not coalesced else None
         return {"ttft": t_first - t0, "decode": decode, "completion_tokens": ct, "prompt_tokens": pt,
-                "wall": t_end - t0, "t0": t0, "t_end": t_end, "text": "".join(text)}
+                "wall": t_end - t0, "t0": t0, "t_end": t_end, "text": "".join(text),
+                "decode_window": window, "coalesced": coalesced}
+
+
+def degenerate(text, min_chars=16, dominant=0.85):
+    """Degenerate-output flag for responses without words.
+
+    looping() measures repeated *word* n-grams, so a response of 64 '!' separated by no
+    whitespace is invisible to it. Measured case: an activation-dtype change made a model emit
+    64 '!' and the sweep scored it as the fastest run. Check the character alphabet too.
+    """
+    compact = "".join(ch for ch in text if not ch.isspace())
+    if len(compact) < min_chars:
+        return False
+    distinct = len(set(compact))
+    if distinct <= 2:                      # e.g. '!' x 64, or '..' repeating
+        return True
+    top = max(compact.count(ch) for ch in set(compact))
+    return top / len(compact) >= dominant
 
 
 def looping(text, n=8, thresh=0.5):
@@ -185,13 +212,25 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
         res["ttft_short_ms"] = round(r["ttft"] * 1000, 1)
 
         c1 = []
+        flag_samples = []
+        max_tps = float(cfg.get("max_plausible_tps", 2000))
         for i in range(reps):
             r = srv.chat(PROMPTS[i % len(PROMPTS)], 512)
-            if r["decode"]:
+            if r.get("coalesced"):
+                flags.append("COALESCED")          # response arrived as one chunk: unmeasurable
+            if degenerate(r["text"]):
+                flags.append("DEGENERATE")         # no-word repetition, e.g. '!' x 64
+                flag_samples.append({"prompt": i % len(PROMPTS), "chars":
+                                     len(r["text"]), "head": r["text"][:120]})
+            if r["decode"] and r["decode"] > max_tps:
+                flags.append("IMPLAUSIBLE")        # beats any real ceiling: do not record it
+            elif r["decode"]:
                 c1.append(round(r["decode"], 2))
             if looping(r["text"]):
                 flags.append("LOOP")
         res["c1_decode"] = round(statistics.median(c1), 2) if c1 else None
+        if flag_samples:
+            res["flag_samples"] = flag_samples
         res["c1_all"] = c1
         log("c1 median", res["c1_decode"], c1)
 
