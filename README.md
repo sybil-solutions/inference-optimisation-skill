@@ -44,6 +44,7 @@ Sources:
   - `xpu/README.md`, `xpu/docs/PROGRESS.md` and `xpu/docs/SGLANG.md` for B70
   - `cuda/README.md` for the RTX 3090
 - [qwen-serve](https://github.com/sybil-solutions/qwen-serve)
+- [inkling2-sparks](https://github.com/swbiggart/inkling2-sparks) and its [interconnect receipt](https://gist.github.com/swbiggart/060e597d3608635f03ae854f3b0f59de/610f8e7d3413d1386fdd8225bdc6661de9ba8058), plus [TensorFold #2969](https://github.com/ashhart/TensorFold/pull/2969) and [#2977](https://github.com/ashhart/TensorFold/pull/2977), for `multinode.md`
 
 ### Reading the B390 result
 
@@ -82,6 +83,7 @@ The skill has three parts:
 **[`references/`](skills/inference-optimisation/references): loaded only when needed.**
 - [`ceilings.md`](skills/inference-optimisation/references/ceilings.md): how to compute decode, prefill, TTFT, startup and KV maxima, with a worked example.
 - [`methodology.md`](skills/inference-optimisation/references/methodology.md): measurement traps. Chunk-counted tokens, mis-sized prompts, acceptance counters, drift, unified-memory accounting.
+- [`multinode.md`](skills/inference-optimisation/references/multinode.md): only when a model is split over GPUs or hosts. Fabric checks, communication time, levers and traps of the links between ranks.
 - [`levers.md`](skills/inference-optimisation/references/levers.md): every lever with measured evidence. It is tagged general vs stack-specific.
 - [`gotchas.md`](skills/inference-optimisation/references/gotchas.md): known traps in vLLM, SGLang, llama.cpp and ExLlama, and on Intel, NVIDIA, Apple and AMD hardware.
 - [`publishing.md`](skills/inference-optimisation/references/publishing.md): pinning, clean builds, the six acceptance gates, proving the build matches the best, results cards.
