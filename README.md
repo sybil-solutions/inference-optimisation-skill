@@ -23,7 +23,7 @@ It works with Claude Code and any agent that loads `SKILL.md`-style skills. Any 
 
 ## What we've been able to accomplish
 
-Results from the hill-climbs this skill was distilled from. Every number was measured on the hardware named; see the linked sources for methods and raw data.
+Results from the original hill-climbs and subsequent contributions. Every number was measured on the hardware named. See the linked sources for methods and raw data.
 
 | Hardware | Model / quant / engine | Before → after |
 |---|---|---|
@@ -34,6 +34,7 @@ Results from the hill-climbs this skill was distilled from. Every number was mea
 | **RTX 3090** | Qwen3.6-35B-A3B EXL3 3 bpw + MTP | **251.7 / 357.9 tok/s**, 1 user |
 | **RTX 3090** | Flash-Next EXL3, 256K context | MTP: 45.5 → **65.6 tok/s** |
 | **4× H200 NVL** | DeepSeek-V4.1-Flash, vLLM + speculative decoding | Crashed under load → **229.1 tok/s** decode, **17,546 tok/s** prefill; all six gates pass |
+| **Apple M4 Max**, 128 GiB unified memory | [Qwen3.8-27B-pi-adapted, Q8_0 + F16 LoRA, llama.cpp Metal](results/apple-m4-max-qwen-pi/README.md) | MTP off → depth 3, 1 user: **15.29 → 33.13 tok/s** median decode, **10.67 → 6.31 s** median Pi edit. Fresh first-token latency rose about 3–4%. |
 
 Sources:
 
