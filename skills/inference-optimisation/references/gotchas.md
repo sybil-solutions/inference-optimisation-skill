@@ -54,5 +54,11 @@ These were found the hard way. Versions matter; re-check on newer releases.
   - `UR_RESULT_ERROR_OUT_OF_RESOURCES` means too-large or piecewise graphs.
 - **Intel integrated GPUs and other unified-memory devices:** GPU memory is invisible to cgroups; see `methodology.md`. Battery and power profiles move results 8–10%.
 - **Apple silicon:** bandwidth-poor chips (base M-series) lose with deep speculation. The GPU wired-memory limit (`iogpu.wired_limit_mb`) caps usable memory.
+- **Apple silicon + Ollama MLX runner (v0.40.17-rc3, Inkling 2 Mini, M4 Pro 48 GB):**
+  - `scripts/queue.sh` needed a `flock` fallback: macOS has none.
+  - The runner chooses parallelism automatically from free-memory headroom (`MLX automatic parallelism parallel=N` in the server log). It went from 1 to 2 when another model was unloaded. Pin `OLLAMA_NUM_PARALLEL` so benchmark A/Bs compare like with like.
+  - `OLLAMA_*` env edits only apply to a server restarted with them. `pkill -f` missed a server launched as `./bin/ollama serve`; kill by PID, then confirm `context_length` in `/api/ps` and the parallelism log line.
+  - `PARAMETER draft_num_predict` in a Modelfile did not change the logged `max_draft`; check the server's speculative-decode stats line before trusting a draft-length sweep.
+  - Probe memory with `/api/ps` size, not process RSS: unified-memory GPU residency is missing from RSS (6 GB RSS vs 25 GiB real for a 20 GB model).
 - **NVIDIA Ampere has no FP8 units;** INT4 (AWQ/GPTQ/EXL) wins when bandwidth-bound.
 - **Hybrid GDN/SSM state dtype:** fp16 state produced `!!!` garbage on one SGLang XPU build, while another engine stored it in fp16 without issue. Verify output after changing the state dtype.

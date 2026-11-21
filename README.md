@@ -33,6 +33,7 @@ Results from the hill-climbs this skill was distilled from. Every number was mea
 | **RTX 3090** | Qwen3.8-27B EXL3 3 bpw + MTP | **96.2 tok/s** prose / **141.1** code, 1 user |
 | **RTX 3090** | Qwen3.6-35B-A3B EXL3 3 bpw + MTP | **251.7 / 357.9 tok/s**, 1 user |
 | **RTX 3090** | Flash-Next EXL3, 256K context | MTP: 45.5 → **65.6 tok/s** |
+| **Apple M4 Pro** (Mac mini, 48 GB unified, 273 GB/s) | Inkling 2 Mini, native NVFP4/MXFP8, Ollama MLX runner | Aggregate decode, 2 users: 18.1 → **29.5 tok/s** (+60%) with parallelism pinned to 2<br>Decode, 1 user: 23.1 tok/s (44% of the ~53 ceiling; config levers plateaued)<br>62.5K-token needle gate: 3/3 ([results](results/apple-m4-pro-inkling-2-mini/)) |
 | **4× H200 NVL** | DeepSeek-V4.1-Flash, vLLM + speculative decoding | Crashed under load → **229.1 tok/s** decode, **17,546 tok/s** prefill; all six gates pass |
 
 Sources:

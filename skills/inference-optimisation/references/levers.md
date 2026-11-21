@@ -47,6 +47,7 @@ The numbers come from real hill-climbs (see the README's results). Use them as p
 
 ## Concurrency and memory
 
+- **[G] On a bandwidth-bound unified-memory machine, a second concurrent stream is nearly free.** Apple M4 Pro / Ollama MLX / Inkling 2 Mini: 2 streams 18.1 -> 29.5 tok/s aggregate (+60%); 4 streams 28.7 (no further gain). Pin the parallelism setting; the engine otherwise picks it from free memory. See `results/apple-m4-pro-inkling-2-mini/`.
 - **[G] For hybrid SSM/GDN/Mamba models, state slots and page size cap concurrency, not KV tokens.**
   - SGLang refused to schedule more than 1 request until `--max-mamba-cache-size` was raised.
   - Keeping vLLM's exact 1,600-token block instead of rounding to 2,048 raised c16 from 10 to 14 streams, +17% aggregate.

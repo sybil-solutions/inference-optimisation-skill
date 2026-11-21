@@ -6,7 +6,12 @@
 #   setsid nohup bash queue.sh ctl-a cand ctl-b > queue.log 2>&1 < /dev/null & disown
 # Run from your experiment directory (the one holding configs/ and ledger.jsonl).
 LOCK=${QUEUE_LOCK:-/tmp/inference-hillclimb.lock}
-exec 9>"$LOCK"; flock 9
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK"; flock 9
+else  # macOS ships no flock: portable mkdir lock (remove "$LOCK.d" by hand if a run was kill -9'd)
+  until mkdir "$LOCK.d" 2>/dev/null; do sleep 2; done
+  trap 'rmdir "$LOCK.d"' EXIT
+fi
 for n in "$@"; do
   python3 "${BENCH:-$(dirname "$0")/bench.py}" run "configs/$n.json" ${BENCH_FLAGS:-} > "runs-$n.log" 2>&1
   echo "done $n: $(tail -c 300 "runs-$n.log" | tr '\n' ' ' | cut -c1-200)"
