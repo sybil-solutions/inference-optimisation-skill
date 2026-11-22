@@ -44,6 +44,8 @@ The numbers come from real hill-climbs (see the README's results). Use them as p
 - **[G] KV cache dtype is a trade.**
   - FP8 KV halves memory, but halved attention throughput on one flash-attention kernel (39 vs 69–74 TFLOPS). Dequantizing blocks to fp16 with an LSE merge recovered it: 128K prefill 760 → 1,059 tok/s.
   - On a model with KV in only 16 of 64 layers, q8_0 KV went from 45.4 to 27.0 tok/s on llama.cpp.
+- **[G] On looped MoE models that exceed VRAM, pin the looped core experts on the GPU (`-ot`) before prelude/postlude blocks.** Sequential offload (`--n-cpu-moe` / `--fit`) spends VRAM on 1×-executed boundary blocks while spilling 3×-executed core blocks to host RAM.
+  - RTX 4070 12 GB + 64 GB DDR5 / Inkling-2-Mini `UD-Q4_K_M` (16.61 GB, `blk.6..17` looped 3× = 72.3% of active expert bytes in 6.88 GB) / llama.cpp b12588, 16K f16 KV, 1 stream: pinning 11 of 12 core blocks to CUDA + `--load-mode none` + `-ub 512` moved decode 25.14–25.15 (`--fit`) → **34.34–34.66 tok/s** (+36.5–37.8%; 16.45–16.50 on `--cpu-moe`), 8K prefill 496–514 → **796–799 tok/s** (+54.8–55.2%; 8.1–8.2× vs `--cpu-moe`), and startup 11.7–12.3 → **3.6–3.8 s**. Dynamic `--moe-cache-mib 6144` reached only 22.47 tok/s. All 12 core blocks reached 37.0 tok/s but dropped free desktop VRAM to 954 MiB and tripped the safety cap.
 
 ## Concurrency and memory
 
