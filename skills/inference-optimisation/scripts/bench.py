@@ -27,7 +27,7 @@ Measurements (all token counts come from the server's usage stats, never from st
   mem_peak_gib, flags (LOOP, REQ_FAIL, ON_BATTERY, MEM_CAP). Results are appended to ledger.jsonl.
 The server is left running after a run (the next run's launch stops it first); stop it yourself when done.
 """
-import json, os, random, statistics, string, subprocess, sys, threading, time, urllib.request
+import json, os, random, re, statistics, string, subprocess, sys, threading, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -39,8 +39,30 @@ PROMPTS = [  # fixed panel: acceptance and speed depend on content, so never ran
     "Write a bash script that backs up a directory to a timestamped tar.gz and keeps only the last 7 backups.",
     "Summarise the causes and consequences of the 1929 stock market crash in five paragraphs.",
 ]
+PROMPTS_AR = [  # fixed Arabic panel for RTL/multilingual tokenizer and speculative decoding evaluation
+    "اكتب تنفيذاً بلغة بايثون لذاكرة تخزين مؤقت (LRU Cache) بتعقيد زمني O(1) لعمليتي القراءة والإدراج مع التوثيق والاختبارات.",
+    "اشرح خطوة بخطوة آلية التحكم في الازدحام في بروتوكول TCP، بما في ذلك البدء البطيء والاسترداد السريع.",
+    "اكتب قصة قصيرة (نحو 600 كلمة) عن حارس منارة يعثر على رسالة غامضة داخل زجاجة على الشاطئ.",
+    "قارن بين أشجار B-Trees وأشجار LSM-Trees لأحمال قواعد البيانات كثيفة الكتابة في جدول مع توصية هندسية.",
+    "اكتب سكربت Bash ينشئ نسخة احتياطية مضغوطة tar.gz لمجلد مع طابع زمني ويحتفظ بآخر 7 نسخ فقط.",
+    "لخّص أسباب وتداعيات انهيار سوق الأسهم عام 1929 في خمس فقرات مترابطة باللغة العربية الفصحى.",
+]
 WORDS = ("river stone paper cloud engine garden silver market winter orange signal harbor violet "
          "candle forest mirror thunder copper meadow lantern").split()
+WORDS_AR = ("نهر حجر ورق سحاب محرك حديقة فضة سوق شتاء برتقال إشارة ميناء بنفسج "
+            "شمعة غابة مرآة رعد نحاس مرج فانوس").split()
+_AR_CLEAN_RE = re.compile(r"[\u0640\u064B-\u065F\u0670]")
+
+
+def get_prompts(lang="en"):
+    if lang == "ar":
+        return PROMPTS_AR
+    if lang == "bilingual":
+        out = []
+        for en_p, ar_p in zip(PROMPTS, PROMPTS_AR):
+            out.extend([en_p, ar_p])
+        return out
+    return PROMPTS
 
 
 def log(*a):
@@ -98,24 +120,32 @@ class Server:
 
 
 def looping(text, n=8, thresh=0.5):
-    """Degenerate-output flag: share of repeated word n-grams."""
-    w = text.split()
+    """Degenerate-output flag: share of repeated word n-grams (normalises Arabic Tatweel/harakat)."""
+    w = _AR_CLEAN_RE.sub("", text).split()
     grams = [tuple(w[i:i + n]) for i in range(max(0, len(w) - n))]
     return len(grams) > 50 and 1 - len(set(grams)) / len(grams) > thresh
 
 
-def document(tokens, seed, needles=3):
+def document(tokens, seed, needles=3, lang="en"):
     """Unique filler document of ~`tokens` tokens with `needles` retrieval codes at spread depths.
     Token count is approximate: the real count comes back as prompt_tokens and is what gets reported."""
     rng = random.Random(seed)
-    n_words = int(tokens / 1.6)
-    words = [rng.choice(WORDS) for _ in range(n_words)]
+    is_ar = lang == "ar"
+    vocab = WORDS_AR if is_ar else WORDS
+    n_words = int(tokens / (2.2 if is_ar else 1.6))
+    words = [rng.choice(vocab) for _ in range(n_words)]
     codes = ["".join(rng.choices(string.ascii_uppercase + string.digits, k=8)) for _ in range(needles)]
     for i, c in enumerate(codes):
         pos = int(n_words * (i + 1) / (needles + 1))
-        words.insert(pos, f". The secret code number {i + 1} is {c}. ")
+        if is_ar:
+            words.insert(pos, f". الرمز السري رقم {i + 1} هو {c}. ")
+        else:
+            words.insert(pos, f". The secret code number {i + 1} is {c}. ")
     head = f"[doc {seed}-{time.time_ns()}] "  # defeats prefix caching
-    q = "\n\nList every secret code number and its value that appears in the document above. Answer only with the codes."
+    if is_ar:
+        q = "\n\nاذكر كل رمز سري ورقمه وقيمته الواردة في المستند أعلاه. أجب بالرموز فقط."
+    else:
+        q = "\n\nList every secret code number and its value that appears in the document above. Answer only with the codes."
     return head + " ".join(words) + q, codes
 
 
@@ -149,9 +179,11 @@ class MemWatch(threading.Thread):
                 self.on_trip()
 
 
-def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
+def run(cfg_path, long_ctx=None, skip_cn=False, reps=6, lang=None):
     cfg = json.load(open(cfg_path))
-    srv, res, flags = Server(cfg), {"name": cfg["name"], "time": time.strftime("%Y-%m-%dT%H:%M:%S")}, []
+    lang = lang or cfg.get("lang", "en")
+    panel = get_prompts(lang)
+    srv, res, flags = Server(cfg), {"name": cfg["name"], "lang": lang, "time": time.strftime("%Y-%m-%dT%H:%M:%S")}, []
     if cfg.get("require_ac") and not on_ac():
         sys.exit("refusing to run on battery (require_ac)")
 
@@ -186,7 +218,7 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
 
         c1 = []
         for i in range(reps):
-            r = srv.chat(PROMPTS[i % len(PROMPTS)], 512)
+            r = srv.chat(panel[i % len(panel)], 512)
             if r["decode"]:
                 c1.append(round(r["decode"], 2))
             if looping(r["text"]):
@@ -198,7 +230,7 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
         n = int(cfg.get("concurrency", 4))
         if n > 1 and not skip_cn:
             with ThreadPoolExecutor(n) as ex:
-                rs = list(ex.map(lambda i: srv.chat(PROMPTS[i % len(PROMPTS)], 512), range(n)))
+                rs = list(ex.map(lambda i: srv.chat(panel[i % len(panel)], 512), range(n)))
             toks = sum((x["completion_tokens"] or 0) for x in rs)
             wall = max(x["t_end"] for x in rs) - min(x["t0"] for x in rs)
             res[f"c{n}_aggregate"] = round(toks / wall, 2)
@@ -206,14 +238,14 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
             log(f"c{n} aggregate", res[f"c{n}_aggregate"])
 
         for L in cfg.get("prefill_lengths", [4096, 32768]):
-            prompt, _ = document(L, seed=L)
+            prompt, _ = document(L, seed=L, lang=lang)
             r = srv.chat(prompt, 1, temperature=0.0)
             res[f"prefill_{L}"] = round(r["prompt_tokens"] / r["ttft"], 1) if r["prompt_tokens"] else None
             res[f"prefill_{L}_tokens"] = r["prompt_tokens"]
             log(f"prefill ~{L}", res[f"prefill_{L}"], "tok/s over", r["prompt_tokens"], "tokens")
 
         if long_ctx:
-            prompt, codes = document(long_ctx, seed=7)
+            prompt, codes = document(long_ctx, seed=7, lang=lang)
             r = srv.chat(prompt, 256, temperature=0.0)
             res["long"] = {"prompt_tokens": r["prompt_tokens"], "ttft_s": round(r["ttft"], 1),
                            "prefill": round(r["prompt_tokens"] / r["ttft"], 1) if r["prompt_tokens"] else None,
@@ -258,5 +290,8 @@ if __name__ == "__main__":
     if a[0] == "show":
         show(*(a[1:2]))
     else:
-        opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
-        run(a[1], long_ctx=int(opt("--long")) if opt("--long") else None, skip_cn="--skip-cN" in a, reps=int(opt("--reps", 6)))
+        opt = lambda k, d="": a[a.index(k) + 1] if k in a else d
+        long_opt = opt("--long")
+        reps_opt = opt("--reps", "6")
+        lang_opt = opt("--lang") or None
+        run(a[1], long_ctx=int(long_opt) if long_opt else None, skip_cn="--skip-cN" in a, reps=int(reps_opt or "6"), lang=lang_opt)
