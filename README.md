@@ -34,6 +34,7 @@ Results from the hill-climbs this skill was distilled from. Every number was mea
 | **RTX 3090** | Qwen3.6-35B-A3B EXL3 3 bpw + MTP | **251.7 / 357.9 tok/s**, 1 user |
 | **RTX 3090** | Flash-Next EXL3, 256K context | MTP: 45.5 → **65.6 tok/s** |
 | **4× H200 NVL** | DeepSeek-V4.1-Flash, vLLM + speculative decoding | Crashed under load → **229.1 tok/s** decode, **17,546 tok/s** prefill; all six gates pass |
+| **2× A100-SXM4-80GB** (TP2) | Qwen3.8-Flash-Next W4A16 (abliterated), vLLM + MTP, PLE table in host RAM | Decode, 1 user: 91.9 → **131.2 tok/s** (+43%)<br>Decode, 2 users: 168.8 → **215.7 tok/s** (+28%)<br>Gates pass, needle 3/3 at 210K<br>Prefill ~4% slower, KV pool −23% ([report](results/a100x2-qwen3.8-flash-next-w4a16-mtp/README.md)) |
 
 Sources:
 
