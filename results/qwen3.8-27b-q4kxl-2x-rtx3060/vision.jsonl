@@ -1,0 +1,22 @@
+{"name": "ctl-r1", "ok": true, "s": 6.3, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ub1024-r1", "ok": false, "error": "server not running"}
+{"name": "ctl-r1", "ok": true, "s": 6.3, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "d2-r1", "ok": true, "s": 6.5, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ctl-r1", "ok": true, "s": 6.4, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "d4-r1", "ok": true, "s": 6.6, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ctl-r1", "ok": true, "s": 6.3, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "kvq8-r1", "ok": false, "error": "server not running"}
+{"name": "ctl-r1", "ok": true, "s": 6.4, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "kvq8-r2", "ok": false, "error": "server not running"}
+{"name": "ctl-r2", "ok": true, "s": 6.6, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "d4-r2", "ok": true, "s": 6.6, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ctl-r2", "ok": true, "s": 6.5, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "d2-r2", "ok": true, "s": 6.5, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ctl-r2", "ok": true, "s": 6.6, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ub1024-r2", "ok": false, "error": "server not running"}
+{"name": "ctl-r2", "ok": true, "s": 6.5, "text": "The image displays a smooth, vibrant gradient that transitions from deep blue and purple in the top-left corner, through"}
+{"name": "ctl-r1", "ok": true, "s": 155.3, "prompt_tokens": 87509, "text": "The image features a smooth gradient that transitions from deep blue and purple in the upper left, through magenta and p"}
+{"name": "ctl-r1", "ok": true, "s": 155.3, "prompt_tokens": 87509, "text": "The image features a smooth gradient that transitions from deep blue and purple in the upper left, through magenta and p"}
+{"name": "ctl-r1", "ok": true, "s": 156.3, "prompt_tokens": 87509, "text": "The image features a smooth gradient that transitions from deep blue and purple in the upper left, through magenta and p"}
+{"name": "ctl-r1", "ok": true, "s": 156.1, "prompt_tokens": 87509, "text": "The image features a smooth gradient that transitions from deep blue and purple in the upper left, through magenta and p"}
+{"name": "ctl-r1", "ok": true, "s": 155.3, "prompt_tokens": 87509, "text": "The image features a smooth gradient that transitions from deep blue and purple in the upper left, through magenta and p"}

@@ -40,6 +40,8 @@ These were found the hard way. Versions matter; re-check on newer releases.
 - Quantized KV (q8_0) can be much slower on models with few KV layers.
 - MTP/draft support can fall below the no-draft baseline on hard prompts.
 - Check work-group sizes in backend kernels: a work-group of 1 in a SYCL copy kernel cost 7.8×.
+- `--split-mode tensor` turns off backend (GPU) sampling without failing: the log says `backend sampling not supported with SPLIT_MODE_TENSOR; using CPU` and `spec ... using CPU sampler` (v0.7.0 and 1.0.0-dev 46eb174). levers.md puts GPU sampling at about +10%, so grep the startup log for it on multi-GPU setups.
+- A config that loads can still OOM at the first request: `--ubatch-size 1024` on a 27B Q4_K_XL, 96K, vision projector on GPU 0 (2× 12 GB) became healthy, then died in `cudaGraphInstantiate` (out of memory, device 0). Count a run as passing only after real requests; a health check isn't enough.
 
 ## ExLlama / TabbyAPI
 
