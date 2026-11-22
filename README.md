@@ -97,6 +97,7 @@ The skill has three parts:
   It flags looping output, failed requests and runs on battery. Token counts come from server usage stats, never from streamed chunks, and everything lands in `ledger.jsonl`.
 - `ceiling.py` computes the theoretical ceilings from a JSON of measured bandwidth and FLOPs plus component sizes.
 - `queue.sh` is a serialized, detachable run queue, for interleaving control/candidate/control runs.
+- `aa.py` reads a ledger of back-to-back runs of one unchanged config and reports the noise floor: how many no-change runs beat both neighbours, and the margin a real win has to clear.
 - `mem.sh` reports a container's real footprint. That includes driver residency on unified-memory GPUs, which cgroups don't see.
 
 ## Install

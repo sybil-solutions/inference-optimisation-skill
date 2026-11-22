@@ -33,7 +33,7 @@ Detailed references, read when needed:
 - `references/levers.md`: levers by area, ordered by typical payoff, with measured evidence.
 - `references/gotchas.md`: engine- and hardware-specific traps.
 - `references/publishing.md`: qualification gates, pinning, poster and report.
-- `scripts/`: an engine-agnostic harness. It has a bench, ceiling calculator, memory watchdog, serialized queue and ledger.
+- `scripts/`: an engine-agnostic harness. It has a bench, ceiling calculator, A/A noise-floor check, memory watchdog, serialized queue and ledger.
 
 ## 0. Before touching anything
 
@@ -81,7 +81,8 @@ Report progress as a percentage of the practical ceiling. If the user's target i
 2. **Control for noise.** Run-to-run noise is typically ±5–10%.
    - Take ≥6 decode samples per run and use the median.
    - Run controls on both sides of each candidate: control, candidate, control.
-   - Accept only if the candidate beats both neighbouring controls on its target metric and regresses nothing by more than ~3%.
+   - Measure the noise floor before the first experiment: run the control ≥10 times back to back and run `scripts/aa.py`. With nothing changed, a run beats both of its neighbours about one time in three, so "beats both controls" alone keeps a third of useless changes.
+   - Accept only if the candidate beats both neighbouring controls on its target metric, beats the better one by more than the measured floor, and regresses nothing by more than ~3%.
    - Repeat any single surprising win.
 3. **Keep the environment fixed.** Stay on AC power, on a fixed performance profile, with an idle host and no other GPU jobs.
    - Make the harness refuse to run otherwise.

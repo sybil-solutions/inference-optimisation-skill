@@ -1,0 +1,4 @@
+45 runs of the same config, c1_decode: median 164.31 (min 141.90, max 166.61, p10-p90 spread 2.9%)
+no-change runs that beat both neighbours: 15 of 43 (35%; chance alone gives about 33%)
+noise floor (largest no-change win over the better neighbour): 1.54%
+=> accept a candidate only if it beats its better control by more than 1.6%, and repeat any win that is close to that

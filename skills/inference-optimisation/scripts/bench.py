@@ -14,7 +14,7 @@ Config (JSON):
     "stop":   ["docker", "stop", "-t", "60", "srv"],  # optional; run after a drain wait
     "health_timeout_s": 900,
     "concurrency": 4,                              # N for the cN test
-    "prefill_lengths": [4096, 32768],              # approximate prompt tokens for cold prefill
+    "prefill_lengths": [4096, 32768],              # prompt tokens for cold prefill (sized per tokenizer)
     "extra_body": {"chat_template_kwargs": {"enable_thinking": false}},  # merged into every request
     "temperature": 0.6,
     "memory": {"cap_gib": 46, "probe": ["bash", "mem.sh", "srv"], "interval_s": 3},  # probe prints bytes
@@ -23,7 +23,8 @@ Config (JSON):
 
 Measurements (all token counts come from the server's usage stats, never from streamed chunks):
   startup_s, ttft_short_ms, c1_decode (median of --reps), c1_all, cN_aggregate (wall clock), cN_per_stream,
-  prefill_<L> (prompt_tokens / TTFT on a unique cold prompt), long-context needle retrieval (--long),
+  prefill_<L> (prompt_tokens / TTFT on a unique cold prompt), long-context needle retrieval (--long N: a prompt
+  of ~N tokens, so keep N below the context window minus the 256-token reply), tokens_per_word (calibration),
   mem_peak_gib, flags (LOOP, REQ_FAIL, ON_BATTERY, MEM_CAP). Results are appended to ledger.jsonl.
 The server is left running after a run (the next run's launch stops it first); stop it yourself when done.
 """
@@ -104,11 +105,16 @@ def looping(text, n=8, thresh=0.5):
     return len(grams) > 50 and 1 - len(set(grams)) / len(grams) > thresh
 
 
-def document(tokens, seed, needles=3):
-    """Unique filler document of ~`tokens` tokens with `needles` retrieval codes at spread depths.
-    Token count is approximate: the real count comes back as prompt_tokens and is what gets reported."""
+SIZING = [1.6, 0.0]  # prompt_tokens ~= SIZING[0] * filler words + SIZING[1]; measured per server by calibrate()
+
+
+def document(tokens, seed, needles=3, n_words=None):
+    """Unique filler document of ~`tokens` prompt tokens with `needles` retrieval codes at spread depths.
+    Sized with the tokens-per-word fit from calibrate(); the real count still comes back as prompt_tokens
+    and is what gets reported."""
     rng = random.Random(seed)
-    n_words = int(tokens / 1.6)
+    if n_words is None:
+        n_words = max(needles + 1, int((tokens - SIZING[1]) / SIZING[0]))
     words = [rng.choice(WORDS) for _ in range(n_words)]
     codes = ["".join(rng.choices(string.ascii_uppercase + string.digits, k=8)) for _ in range(needles)]
     for i, c in enumerate(codes):
@@ -117,6 +123,24 @@ def document(tokens, seed, needles=3):
     head = f"[doc {seed}-{time.time_ns()}] "  # defeats prefix caching
     q = "\n\nList every secret code number and its value that appears in the document above. Answer only with the codes."
     return head + " ".join(words) + q, codes
+
+
+def calibrate(srv):
+    """Fit prompt_tokens = slope * words + intercept on this server's tokenizer and chat template, from four
+    small probe documents (two sizes, two seeds each). Without it the 1.6 tokens/word guess can be far off:
+    on a Llama-3 tokenizer the filler words are ~1.05 tokens each, so `--long N` produced about two-thirds of N.
+    Any failure (no usage stats, a context window too small for the probes) leaves the default in place."""
+    try:
+        mean = {}
+        for n in (200, 800):
+            t = [srv.chat(document(None, seed=n + k, n_words=n)[0], 1, temperature=0.0)["prompt_tokens"] for k in (0, 1)]
+            mean[n] = sum(t) / 2
+        slope = (mean[800] - mean[200]) / 600
+        if slope > 0:
+            SIZING[0], SIZING[1] = slope, mean[200] - 200 * slope
+    except Exception:
+        pass
+    return SIZING
 
 
 def on_ac():
@@ -183,6 +207,7 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
         srv.chat("Say hello.", 16)  # warm-up (not measured)
         r = srv.chat("Reply with the single word: ready", 8)
         res["ttft_short_ms"] = round(r["ttft"] * 1000, 1)
+        res["tokens_per_word"] = round(calibrate(srv)[0], 3)
 
         c1 = []
         for i in range(reps):
