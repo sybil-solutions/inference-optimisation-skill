@@ -37,7 +37,9 @@ These were found the hard way. Versions matter; re-check on newer releases.
 
 ## llama.cpp / GGML
 
-- Quantized KV (q8_0) can be much slower on models with few KV layers.
+- Quantized KV (q8_0) can be much slower on models with few KV layers, but it is not always: on CUDA with tensor split (2× RTX 3060, v0.7.0) q4_0/q8_0/f16 KV decoded the same.
+- `llama-server` routers (`--models-preset`) log a `proxying request` line for every request, including status polls from dashboards. Don't treat those lines as "someone is using the model" when waiting for an idle window. Use the generation `print_timing ... eval time` lines.
+- New architectures can lack multi-GPU paths for weeks. Inkling 2 Mini (`inkling2_loop`) at build 46eb174: `--split-mode tensor` is not implemented, and `--split-mode layer` put the whole weight buffer on one GPU even with `--tensor-split 1,1`.
 - MTP/draft support can fall below the no-draft baseline on hard prompts.
 - Check work-group sizes in backend kernels: a work-group of 1 in a SYCL copy kernel cost 7.8×.
 

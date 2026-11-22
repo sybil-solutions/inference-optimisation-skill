@@ -29,7 +29,9 @@ The numbers come from real hill-climbs (see the README's results). Use them as p
   - **The best draft length depends on concurrency and context:**
     - B70: k=4 won at c1, k=3 at c4, k=2 at c16 (+11%, because more streams fit).
     - B390 at 128K: 1 draft ran 29.6 tok/s vs 15.5 for 3 drafts, although 3 drafts won at short context.
-    - Sweep the draft length per workload.
+    - **And on what the output is.** Arete-27B (Qwen3.8-27B fine-tune) MTP on 2× RTX 3060, llama.cpp: at ~100K context 4 drafts beat 3 by 20% (48.0 vs 39.7 tok/s) when the answer copied text from the context (needle answers), but on freshly written prose and code no draft count from 2 to 5 beat 3 by more than the controls' own spread (about ±7%) at any context from 0 to 99K. In the needle runs, 2 drafts won short context by 3.5% and lost 10% at 100K.
+    - Sweep the draft length per workload, with prompts that match the real output (agent edits quote existing code; chat answers don't).
+  - **A minimum draft probability can cost more than it saves.** llama.cpp `--spec-draft-p-min` 0.5 / 0.75 on the same setup: −25% / −35% short-context decode, long-context decode unchanged.
   - **Some MTP heads are weak beyond depth 1.** Ornith-1.5 accepted ~14% at depth 2, so its best was one draft. Measure acceptance per depth.
   - **On bandwidth-poor devices or hard prompts, speculation can lose:**
     - Apple M4: 6.35 → 3.25 tok/s with 3 MTP drafts.
@@ -44,6 +46,7 @@ The numbers come from real hill-climbs (see the README's results). Use them as p
 - **[G] KV cache dtype is a trade.**
   - FP8 KV halves memory, but halved attention throughput on one flash-attention kernel (39 vs 69–74 TFLOPS). Dequantizing blocks to fp16 with an LSE merge recovered it: 128K prefill 760 → 1,059 tok/s.
   - On a model with KV in only 16 of 64 layers, q8_0 KV went from 45.4 to 27.0 tok/s on llama.cpp.
+  - Not universal: on Arete-27B (also 16 of 64 KV layers), llama.cpp v0.7.0 CUDA, 2× RTX 3060 tensor split, q4_0 (128K), K-q8/V-q4 (128K), q8_0 (96K) and f16 (48K) KV all decoded within the controls' spread (candidates 52.6–58.4 tok/s c1 vs controls 52.6–59.8 over 37 runs; interleaved controls, 2 rounds each). There, q4_0 is free and holds the most context. Measure it on your stack before paying for a wider KV dtype.
 
 ## Concurrency and memory
 

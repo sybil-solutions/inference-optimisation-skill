@@ -18,7 +18,8 @@ Config (JSON):
     "extra_body": {"chat_template_kwargs": {"enable_thinking": false}},  # merged into every request
     "temperature": 0.6,
     "memory": {"cap_gib": 46, "probe": ["bash", "mem.sh", "srv"], "interval_s": 3},  # probe prints bytes
-    "require_ac": true                             # refuse to run on battery (Linux / macOS)
+    "require_ac": true,                            # refuse to run on battery (Linux / macOS)
+    "api_key_env": "MY_SERVER_KEY"                 # optional: send Authorization: Bearer $MY_SERVER_KEY (key never stored here)
   }
 
 Measurements (all token counts come from the server's usage stats, never from streamed chunks):
@@ -50,9 +51,13 @@ def log(*a):
 class Server:
     def __init__(self, cfg):
         self.cfg, self.base = cfg, cfg.get("base_url", "http://127.0.0.1:8000").rstrip("/")
+        key = os.environ.get(cfg["api_key_env"], "") if cfg.get("api_key_env") else ""
+        if cfg.get("api_key_env") and not key:
+            sys.exit(f"api_key_env is set but ${cfg['api_key_env']} is empty")
+        self.auth = {"Authorization": f"Bearer {key}"} if key else {}
 
     def get(self, path, timeout=5):
-        with urllib.request.urlopen(self.base + path, timeout=timeout) as r:
+        with urllib.request.urlopen(urllib.request.Request(self.base + path, headers=self.auth), timeout=timeout) as r:
             return json.loads(r.read() or b"{}")
 
     def healthy(self):
@@ -68,7 +73,7 @@ class Server:
                 "temperature": self.cfg.get("temperature", 0.6) if temperature is None else temperature}
         body.update(self.cfg.get("extra_body", {}))
         req = urllib.request.Request(self.base + "/v1/chat/completions", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"})
+                                     headers={"Content-Type": "application/json", **self.auth})
         t0 = time.monotonic(); t_first = None; text = []; usage = {}
         with urllib.request.urlopen(req, timeout=timeout) as r:
             for raw in r:

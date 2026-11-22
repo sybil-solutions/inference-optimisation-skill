@@ -1,0 +1,161 @@
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+{"name": "kvq8-128k-r1", "ok": false, "error": "server not running"}
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+{"name": "kvq8-128k-r2", "ok": false, "error": "server not running"}
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "<stdin>", line 3, in <genexpr>
+TypeError: 'tuple' object cannot be interpreted as an integer
+{"name": "ctl-r1", "ok": true, "s": 8.3, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d2-r1", "ok": true, "s": 8.1, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ub1024-r1", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d2-r1", "ok": true, "s": 8.0, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.8, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d2-r2", "ok": true, "s": 6.4, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 6.3, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ub1024-r2", "ok": true, "s": 6.2, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 6.3, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d2-r2", "ok": true, "s": 6.5, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 6.3, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.5, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "pmin50-r1", "ok": true, "s": 7.8, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.6, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "pmin75-r1", "ok": true, "s": 8.1, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.6, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d4-r1", "ok": true, "s": 7.6, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.5, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d4-pmin50-r1", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.6, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ub1024-r1", "ok": true, "s": 7.4, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.6, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ub2048-r1", "ok": false, "error": "server not running"}
+{"name": "ctl-r1", "ok": true, "s": 7.4, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "split-layer-r1", "ok": true, "s": 7.2, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 7.6, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "split-layer-r2", "ok": true, "s": 7.2, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 7.8, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ub2048-r2", "ok": false, "error": "server not running"}
+{"name": "ctl-r2", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ub1024-r2", "ok": true, "s": 7.7, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d4-pmin50-r2", "ok": true, "s": 8.1, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 8.0, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "d4-r2", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 7.8, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "pmin75-r2", "ok": true, "s": 8.4, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 7.9, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "pmin50-r2", "ok": true, "s": 8.1, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r2", "ok": true, "s": 8.0, "text": "The image features a smooth, multi-colored gradient that transitions from deep blue and purple in the top-left, through "}
+{"name": "ctl-r1", "ok": true, "s": 183.4, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 185.6, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 186.0, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 186.1, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 185.8, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ub1024-r1", "ok": true, "s": 181.0, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 186.0, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 185.0, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
+{"name": "ctl-r1", "ok": true, "s": 185.5, "prompt_tokens": 103923, "text": "The image displays a smooth gradient blending deep blue and purple in the top left, transitioning through magenta and pi"}
