@@ -47,6 +47,8 @@ The numbers come from real hill-climbs (see the README's results). Use them as p
 
 ## Concurrency and memory
 
+- **[S: llama.cpp] For MoE models that spill experts to system RAM, shrink auto-fit's safety margin.** `--fit-target` (default 1024 MiB per device) is VRAM that could hold experts. Qwen3.6-35B-A3B on 2× RTX 3060: 512 MiB gave +3–8% decode and +7–8% prefill; 256 MiB was faster still but OOMed on the first image request. A bigger `--ubatch-size` competes for the same VRAM: prefill +15%, decode −6 to −10%.
+
 - **[G] For hybrid SSM/GDN/Mamba models, state slots and page size cap concurrency, not KV tokens.**
   - SGLang refused to schedule more than 1 request until `--max-mamba-cache-size` was raised.
   - Keeping vLLM's exact 1,600-token block instead of rounding to 2,048 raised c16 from 10 to 14 streams, +17% aggregate.

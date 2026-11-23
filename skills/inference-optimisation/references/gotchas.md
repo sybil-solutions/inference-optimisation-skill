@@ -40,6 +40,7 @@ These were found the hard way. Versions matter; re-check on newer releases.
 - Quantized KV (q8_0) can be much slower on models with few KV layers.
 - MTP/draft support can fall below the no-draft baseline on hard prompts.
 - Check work-group sizes in backend kernels: a work-group of 1 in a SYCL copy kernel cost 7.8×.
+- Vision projectors allocate their compute buffer at the first image, not at load. Configs that passed load, needle, tool-call and prefill gates crashed the server on their first image request (`--fit-target 256`, and `--ubatch-size 1024` + `--fit-target 512`, on a 35B MoE with 2× 12 GB). Put an image request in the gates of any multimodal setup.
 
 ## ExLlama / TabbyAPI
 
