@@ -34,6 +34,7 @@ Results from the hill-climbs this skill was distilled from. Every number was mea
 | **RTX 3090** | Qwen3.6-35B-A3B EXL3 3 bpw + MTP | **251.7 / 357.9 tok/s**, 1 user |
 | **RTX 3090** | Flash-Next EXL3, 256K context | MTP: 45.5 → **65.6 tok/s** |
 | **4× H200 NVL** | DeepSeek-V4.1-Flash, vLLM + speculative decoding | Crashed under load → **229.1 tok/s** decode, **17,546 tok/s** prefill; all six gates pass |
+| **Apple M2 Max** 30-core (64 GB unified, ~368 GB/s) | Inkling-2-Mini NVFP4 + MTP, mlx-dspark with FP16 fused Metal kernels | Decode, 1 user: 32.4 → **37.0 tok/s** (median across 3 runs)<br>Decode, 4 users: **59.2 tok/s** aggregate<br>Prefill 4K/16K: 280/276 → **319-358 / 315-350 tok/s**<br>Warm TTFT at 21K: 20.5 s → **0.71 s**<br>Needle 3/3 at 64K, token-forcing gate PASS ([report](results/m2-max-64gb-inkling-2-mini/README.md)) |
 
 Sources:
 
