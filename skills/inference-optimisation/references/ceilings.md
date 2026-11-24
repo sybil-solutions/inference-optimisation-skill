@@ -38,6 +38,16 @@ prefill_ceiling(L) ≈ 0.5 × measured_peak_flops / mean_flops_per_token(L)
 
 Int8/FP8 tensor cores double the peak for the parts that use them. For MoE, small per-expert row counts at a given chunk size lower GEMM efficiency; that is usually the biggest gap.
 
+## Three ways the ceiling comes out too high
+
+These cost one hill-climb a wrong headline: a looped MoE on an RTX PRO 6000 (Inkling 2 Mini, Basalt engine) first read as "55% of the c1 ceiling, 5% of the c8 ceiling". Corrected, it was close to normal on both.
+
+- **Looped (recurrent-depth) models read some weights more than once per token.** Count layer *visits*, not layers. Inkling 2 Mini has 24 physical layers; the 12-layer core runs 3 times, so a token makes 48 visits and reads the dense and expert bytes about twice. Leaving that out doubled the c1 ceiling (784 to about 390 tok/s).
+- **Spec-sheet FP4/FP8 peaks often assume 2:4 structured sparsity.** Dense prompt-processing GEMMs get about half. Use the dense figure, or measure a dense GEMM at that precision. On the same box, using the sparse peak and the physical active parameters (not the looped effective ones) put the 32K prefill ceiling at 99K tok/s; the corrected figure was about 34K, against 16.4K measured.
+- **Engines cap the rows in one decode step.** If the cap is R rows and there are N streams, each stream gets about R/N rows, so drafting stops when N reaches R. Check the engine for a compile-time window limit (Basalt: `kDecodeRows = 8`; its MMVQ products take at most 8 columns). Above that point, model cN with no drafts. The server log can show it: tokens kept per step fell from 1.5 to 3.3 per request solo to exactly 1.0 for every request at 8 streams.
+
+Also: the union-of-experts formula treats draft rows as independent. Rows of one conversation share most of their experts, so with many drafts it can predict *less* than you measure. When it does, report the no-draft row as the bound.
+
 ## TTFT, startup, KV
 
 - **Short-prompt TTFT floor:** one forward pass (bytes ÷ bandwidth) plus tokenize and schedule. That is typically 30–60 ms on a laptop and a few ms on datacenter GPUs.
