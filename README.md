@@ -84,9 +84,11 @@ The skill has three parts:
 - [`methodology.md`](skills/inference-optimisation/references/methodology.md): measurement traps. Chunk-counted tokens, mis-sized prompts, acceptance counters, drift, unified-memory accounting.
 - [`levers.md`](skills/inference-optimisation/references/levers.md): every lever with measured evidence. It is tagged general vs stack-specific.
 - [`gotchas.md`](skills/inference-optimisation/references/gotchas.md): known traps in vLLM, SGLang, llama.cpp and ExLlama, and on Intel, NVIDIA, Apple and AMD hardware.
+- [`onboarding.md`](skills/inference-optimisation/references/onboarding.md): Mac preflight, a 15-minute best-engine-first bake-off, quality baselines and dead-end logging.
 - [`publishing.md`](skills/inference-optimisation/references/publishing.md): pinning, clean builds, the six acceptance gates, proving the build matches the best, results cards.
 
 **[`scripts/`](skills/inference-optimisation/scripts): a small, engine-agnostic harness.** It is standard-library Python plus bash.
+- `preflight.py` inventories the host, checks AC power and localhost ports, estimates model sizes from a local checkpoint when possible, and writes starter `ceiling.json`, `config.json` and `DEAD-ENDS.md` files. A memory cap is enforced only when `--memory-probe` supplies a real-byte footprint command.
 - `bench.py` benchmarks any OpenAI-compatible server. It measures:
   - startup and short-prompt TTFT;
   - c1 decode (median of N) and cN aggregate decode;
@@ -94,9 +96,9 @@ The skill has three parts:
   - long-context needle retrieval;
   - peak memory, with a cap watchdog.
 
-  It flags looping output, failed requests and runs on battery. Token counts come from server usage stats, never from streamed chunks, and everything lands in `ledger.jsonl`.
+  It also provides a ~90-second `screen` (prose, greedy prefill, code edit, OpenAI tool calls and turn-2 prefix caching), a bounded greedy-output `quality` gate, and a Markdown `report` with separate full-run/screen leaderboards and visible quality failures. Token counts come from server usage stats, never from streamed chunks, and everything lands in `ledger.jsonl`.
 - `ceiling.py` computes the theoretical ceilings from a JSON of measured bandwidth and FLOPs plus component sizes.
-- `queue.sh` is a serialized, detachable run queue, for interleaving control/candidate/control runs.
+- `queue.sh` is a serialized, detachable run queue, for interleaving control/candidate/control runs. It uses Python's portable `fcntl.flock` on Linux and macOS, with a private per-user lock directory and a nonzero exit status if any benchmark fails.
 - `mem.sh` reports a container's real footprint. That includes driver residency on unified-memory GPUs, which cgroups don't see.
 
 ## Install
@@ -120,12 +122,16 @@ Other agents: point them at `skills/inference-optimisation/SKILL.md`, or paste [
 
 ```bash
 S=skills/inference-optimisation
-python3 $S/scripts/ceiling.py $S/examples/ceiling-ornith-b390.json        # ceilings
-mkdir -p configs && cp $S/examples/config-existing-server.json configs/base.json   # edit base_url/model
-python3 $S/scripts/bench.py run configs/base.json --long 131072            # one run
-bash $S/scripts/queue.sh base cand base                                     # interleaved A/B
-python3 $S/scripts/bench.py show                                            # ledger table
+python3 $S/scripts/preflight.py --model my-model --model-path /path/to/checkpoint --out .  # inventory + starter files
+python3 $S/scripts/ceiling.py ceiling.json                                         # ceilings
+mkdir -p configs && cp config.json configs/base.json                               # edit base_url/model/launch
+python3 $S/scripts/bench.py screen configs/base.json                               # ~90-second smoke screen
+python3 $S/scripts/bench.py run configs/base.json --long 131072                     # one full run
+bash $S/scripts/queue.sh base cand base                                            # interleaved A/B
+python3 $S/scripts/bench.py report                                                 # Markdown leaderboard
 ```
+
+For a new Mac or an undecided engine, follow [`references/onboarding.md`](skills/inference-optimisation/references/onboarding.md): preflight, then a serialized 15-minute bake-off of two or three compatible engines before tuning one.
 
 ## Principles that carried the most weight
 
@@ -140,7 +146,17 @@ python3 $S/scripts/bench.py show                                            # le
   - Sweep draft length per concurrency and context.
   - Keep sampling on the GPU.
 - **Prove full-context stability** with exact-match needles and a concurrent full-KV soak before calling anything "best".
-- **Write down failures.** Most of the value in `PLAN.md` is the list of things that did *not* work and why.
+- **Write down failures.** Most of the value in `PLAN.md` is the list of things that did *not* work and why. Keep the short reusable version in `DEAD-ENDS.md`.
+
+## Development
+
+The harness and regression tests use only the Python standard library and bash:
+
+```bash
+python3 -m unittest discover -s tests -v
+bash tests/test_queue_lock.sh
+bash -n skills/inference-optimisation/scripts/*.sh
+```
 
 ## Contributing
 

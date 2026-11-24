@@ -25,7 +25,7 @@ bytes_per_emitted_token = (verify_bytes + draft_bytes) / a
 c1_ceiling = measured_bandwidth / bytes_per_emitted_token
 ```
 
-For a concurrency of N, dense weights are read once per step for all streams; experts follow the union of all rows' routing; KV is per stream. The aggregate ceiling therefore grows almost linearly with N until the expert union and per-stream KV dominate the bytes.
+For a concurrency of N, dense weights are read once per step for all streams; experts follow the union of all rows' routing; KV is per stream. Draft-model weights are also shared by the batched draft step, so their bytes are counted once per step, not once per stream. The aggregate ceiling therefore grows almost linearly with N until the expert union and per-stream KV dominate the bytes.
 
 ## Prefill (compute bound)
 

@@ -32,8 +32,9 @@ Detailed references, read when needed:
 - `references/methodology.md`: measurement pitfalls and statistics.
 - `references/levers.md`: levers by area, ordered by typical payoff, with measured evidence.
 - `references/gotchas.md`: engine- and hardware-specific traps.
+- `references/onboarding.md`: Mac preflight, best-engine-first screening, quality baselines and dead-end logging.
 - `references/publishing.md`: qualification gates, pinning, poster and report.
-- `scripts/`: an engine-agnostic harness. It has a bench, ceiling calculator, memory watchdog, serialized queue and ledger.
+- `scripts/`: an engine-agnostic harness. It has preflight, a fast screen, a full bench, a quality gate, a Markdown report, a ceiling calculator, memory watchdog, serialized queue and ledger.
 
 ## 0. Before touching anything
 
@@ -42,6 +43,9 @@ Detailed references, read when needed:
   - Memory cap.
   - Context length that must stay stable.
   - Which quality changes are allowed: lossless only, or labelled lossy trades such as int8 prefill.
+- **On a new host, run preflight before hand-editing harness inputs:**
+  - `python3 scripts/preflight.py --model NAME --model-path /path/to/checkpoint --out .`
+  - It records the hardware, AC state, port choice and model-size estimates, then writes `ceiling.json`, `config.json` and a `DEAD-ENDS.md` scaffold. Review every assumption; measure real bandwidth and FLOPs before treating a ceiling as final.
 - **Inventory the machine:**
   - accelerator, memory type and size, and whether memory is unified;
   - driver, engine version, model, quantization, current launch command.
@@ -56,6 +60,20 @@ Detailed references, read when needed:
   - `ledger.jsonl`: one line per run, from the harness.
   - `configs/`: one JSON per run.
   - `best-config.json`.
+  - `DEAD-ENDS.md`: rejected changes and the evidence that killed them.
+
+### 0.1 Best engine first (only when the engine is not fixed)
+
+Before spending time tuning one server, compare two or three installed engines that support this exact model, quantization and chip. Do not install or rank engines by brand alone; compatibility and measured throughput decide.
+
+1. Make one `configs/engine-NAME.json` per engine, with its own port and launch/stop commands. A launch command must return after starting the server (for example a daemonized process or `docker run -d`).
+2. Screen them serially, with a 15-minute total budget including startup:
+   ```bash
+   BENCH_MODE=screen BENCH_FLAGS="--budget 90 --prefill 4096" bash scripts/queue.sh engine-a engine-b engine-c
+   python3 scripts/bench.py report
+   ```
+3. Reject an engine that fails the screen, cannot hold the model under the cap, or spends the whole budget starting. The screen checks three prose reps, a cold 4K greedy prefill, a code edit, an OpenAI `tool_calls` round-trip, and a cached turn-2 prefix. It is a smoke gate, not a statistical speed comparison.
+4. Run full interleaved benchmarks on the surviving engine(s). See `references/onboarding.md` for the Mac workflow.
 
 ## 1. Ceilings first
 
@@ -80,6 +98,7 @@ Report progress as a percentage of the practical ceiling. If the user's target i
 1. **One change per experiment.** Give each its own config file. Derive new configs from the current best.
 2. **Control for noise.** Run-to-run noise is typically ±5–10%.
    - Take ≥6 decode samples per run and use the median.
+   - Run `bench.py screen` on a new config before a full A/B. A failed tool call, broken code edit, greedy hang, missing prefix reuse, loop or empty output kills the config early.
    - Run controls on both sides of each candidate: control, candidate, control.
    - Accept only if the candidate beats both neighbouring controls on its target metric and regresses nothing by more than ~3%.
    - Repeat any single surprising win.
@@ -89,13 +108,13 @@ Report progress as a percentage of the practical ceiling. If the user's target i
    - Restore any profile you changed when you finish, and tell the user.
 4. **Run one GPU job at a time.** Serialize them with a lock (`scripts/queue.sh`).
    - Never use `pkill -f`/`pgrep -f` patterns that can match your own shell.
-   - Detach long queues (`setsid nohup … &`) so they survive agent restarts.
+   - Detach long queues (`nohup bash scripts/queue.sh … > queue.log 2>&1 < /dev/null & disown`) so they survive agent restarts. `nohup` works on both Linux and macOS; `setsid` is Linux-only.
 5. **Enforce the memory cap with a watchdog** that kills the run.
    - On unified memory, GPU allocations do not show in cgroup counters or MemAvailable. Measure driver residency (e.g. `drm-resident-*` in `/proc/<pid>/fdinfo`, `nvidia-smi`, or `ioreg`/`vm_stat` on Apple) plus process anonymous memory.
 6. **Stability gates.** A config is only "best" after it passes:
    - a long-context retrieval run, with needles in a ~50% then ~100% context document, found exactly;
    - a soak with concurrent full-length requests, if the KV pool is sized for N users;
-   - a greedy output equivalence check, if the change claims to be lossless.
+   - a greedy output equivalence check, if the change claims to be lossless. Capture the control with `bench.py quality configs/ctl.json --write-baseline quality-baseline.json`, then require `bench.py quality configs/cand.json --baseline quality-baseline.json` to pass. Any mismatch is a rejection until investigated; a late numerics tie is evidence to inspect, not permission to ignore an early or repeated divergence.
 7. **Never force-kill a server mid-batch.** Abort requests, wait for the drain, then stop with a timeout. A forced stop mid-prefill has caused GPU driver faults.
 8. **Verify outputs, not just speed.** Flag degenerate or looping output, failed requests and an idle GPU. A suspiciously fast result is usually broken output.
 9. **Log everything in `PLAN.md`,** including failures and why they failed. Negative results are the most reusable output.
@@ -160,7 +179,7 @@ See `references/publishing.md`.
 
 ## 5. Reporting to the user
 
-- **Start with a table:** metric, baseline, now, ceiling, how it was measured (median of N, cold or warm, which harness).
+- **Start with a table:** metric, baseline, now, ceiling, how it was measured (median of N, cold or warm, which harness). Use `python3 scripts/bench.py report` for the Markdown leaderboard and `show` for the full history.
 - **Then:** what got the gains, why it stops here, the known limitations, and the system state you changed (power profile, running servers, uncommitted code, branches that must not be deleted).
 - **Say plainly** what was not verified.
 - **When asked to free the GPU:** drain, stop the server, confirm no processes and an idle clock, and end any loop.

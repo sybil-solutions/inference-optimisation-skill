@@ -23,33 +23,35 @@ You are optimising the serving speed of a local LLM on this machine. Use the `in
 ## How to manage the work
 
 1. **Set up and measure.**
-   - Set up the experiment directory: `PLAN.md`, `THEORY.md`, `configs/`, `ledger.jsonl`, `best-config.json`.
-   - Inventory the machine, and measure real bandwidth and matmul throughput.
+   - Set up the experiment directory: `PLAN.md`, `THEORY.md`, `DEAD-ENDS.md`, `configs/`, `ledger.jsonl`, `best-config.json`.
+   - On a new host, run `scripts/preflight.py --model <name> --model-path <checkpoint> --out .`; review its assumptions, then inventory the machine and measure real bandwidth and matmul throughput.
+   - If the engine is not fixed, screen two or three compatible installed engines serially with `BENCH_MODE=screen bash scripts/queue.sh engine-a engine-b engine-c`; keep the total bake-off under 15 minutes including startup. Reject screen failures before tuning.
    - Compute the ceilings with `scripts/ceiling.py` and write them to `THEORY.md`.
    - Measure the baseline with `scripts/bench.py`.
 2. **Loop:**
    - Pick the lever with the biggest expected gain, using the lever order in `SKILL.md` and the evidence in `references/levers.md`.
    - Make exactly one change in a new config.
+   - Run `scripts/bench.py screen configs/cand.json`; reject tool, code, greedy, prefix-cache, loop or empty-output failures.
    - Run it between two controls with `scripts/queue.sh ctl cand ctl`.
-   - Accept or reject it, and log the numbers and the reason in `PLAN.md`.
+   - Accept or reject it, and log the numbers and the reason in `PLAN.md` and, for reusable negative results, `DEAD-ENDS.md`.
    - Never rerun something `PLAN.md` already rejected without a new reason.
 3. **Gate every new best:**
    - long-context needle retrieval at ~50%, then ~100% of the context;
    - a concurrent full-length soak if the KV pool is sized for N users;
-   - a greedy equivalence check for changes claimed to be lossless.
+   - a greedy equivalence check for changes claimed to be lossless: capture the control with `scripts/bench.py quality configs/ctl.json --write-baseline quality-baseline.json`, then require the candidate to pass with `--baseline quality-baseline.json`.
 4. **Safety, always:**
    - one GPU job at a time;
    - an AC power and performance-profile guard;
    - the memory watchdog on;
    - drain requests before stopping a server, never force-kill mid-batch;
-   - detach long queues so they survive restarts.
+   - detach long queues with portable `nohup bash scripts/queue.sh … > queue.log 2>&1 < /dev/null & disown` so they survive restarts.
 5. **Credentials:** if a sudo password or token is needed, ask once, through your harness's secret mechanism. Store it in a mode-600 file and never print it, commit it, or put its path in anything published.
 6. **Cadence:** if told "don't stop", keep looping. When three levers in a row land inside noise, write a STATUS/plateau section in `PLAN.md` and keep going at a slower cadence: profile, then try kernel-level levers. Otherwise, hand back at the plateau.
 7. **Afterwards:** restore the best server on its usual port, unless the user asked for the GPU to be freed.
 
 ## How to report
 
-Every report, whether progress or final, starts with this table:
+Every report, whether progress or final, starts with the Markdown leaderboard from `scripts/bench.py report`, then this table with ceilings and measurement context filled in:
 
 | Metric | Baseline | Now | Ceiling | How measured |
 |---|---:|---:|---:|---|

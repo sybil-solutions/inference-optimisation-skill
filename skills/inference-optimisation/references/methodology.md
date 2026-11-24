@@ -37,6 +37,14 @@ Most "wins" and "regressions" in inference tuning are measurement errors. In eve
 - A fixed decode window can end inside a long prefill. Use a dedicated long-context run: a cold request, then a warm same-document request.
 - Retrieval needles (3 random codes at different depths, answered exactly) prove the whole context works. Speed alone doesn't.
 
+## Fast screening and quality gates
+
+- **Screen before measuring.** `bench.py screen` spends at most its `--budget` (default 90 seconds) after the server is healthy. It runs three fixed prose reps, a cold 4K greedy prefill, a small code edit, an OpenAI `tool_calls` round-trip, and a two-turn prefix-cache probe. A screen is a pass/fail smoke test, not evidence of a speedup.
+- **A greedy request must finish.** The screen bounds both total elapsed time and each socket read, so a `temperature: 0` request that hangs or dribbles data is rejected instead of stalling the queue. A stream that closes before `[DONE]` or a terminal `finish_reason` is also a failure; the tool probe additionally requires a terminal `tool_calls` finish reason and server usage.
+- **Prefix caching must be visible.** Turn 2 must report at least 80% of turn 1's prompt tokens as `cached_tokens` and start within `screen_prefix_max_s` (default 1 second). Servers that omit usage details fail this gate; do not infer a cache hit from latency alone.
+- **Code and tool gates validate structure, not correctness of the model.** The code check statically evaluates a tiny clamp fix without executing model output. The tool check requires a `get_weather` call with valid JSON arguments. Neither replaces the full long-context and agent-task gates.
+- **Capture a quality baseline before lossy changes.** `bench.py quality --write-baseline` records deterministic greedy outputs; `--baseline` compares the candidate exactly and reports the first divergence. The default total budget is 300 seconds including startup and watchdog cleanup (`--budget`). Whitespace-only differences are counted separately. Investigate every exact mismatch before calling a change lossless.
+
 ## Output sanity
 
 - Flag looping output (repeated shingles), failed requests, an idle GPU (<60% busy in the window), prefill inside the decode window, and KV-bound admission. A 117 tok/s "record" was a model emitting a numbered list in a loop.
@@ -45,7 +53,7 @@ Most "wins" and "regressions" in inference tuning are measurement errors. In eve
 
 - On unified memory (Apple, Intel/AMD iGPU, GB10/Spark-class), GPU allocations bypass cgroup accounting. A MemAvailable delta showed 14 GiB where the real footprint was 29.4 GiB.
 - Sum driver residency (Linux DRM: `drm-resident-*` in `/proc/<pid>/fdinfo`, deduplicated by `drm-client-id`) plus cgroup `anon`.
-- Track the peak with a ~1–5 s sampler, and kill the run at the cap.
+- Track the peak with a ~1–5 s sampler, and kill the run at the cap. A missing, failing, or timed-out probe voids the run; a configured cap is never treated as enforced without a successful sample.
 
 ## Profiling
 

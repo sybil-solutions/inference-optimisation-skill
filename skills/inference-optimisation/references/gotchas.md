@@ -10,7 +10,7 @@ These were found the hard way. Versions matter; re-check on newer releases.
 - **Very large images can crash vision encoders.** Cap the longest edge.
 - **Gateway or proxy timeouts** (often 600 s) cut off long-context tests. Test against the engine directly. Retry only on dropped connections, never on timeouts.
 - **Shells and agents:** `pkill -f pattern` can kill the shell that runs it, and `pgrep -f` can wait on itself. Kill by PID.
-- **Agent restarts** kill child processes. Detach long jobs (`setsid nohup … & disown`) and make them resumable.
+- **Agent restarts** kill child processes. Detach long jobs (`nohup bash scripts/queue.sh … > queue.log 2>&1 < /dev/null & disown`) and make them resumable. Plain `nohup` is portable; `setsid` is not available on stock macOS.
 
 ## vLLM
 
@@ -53,6 +53,6 @@ These were found the hard way. Versions matter; re-check on newer releases.
   - Split-K partial stores need uncached stores plus a clean fence on Xe3.
   - `UR_RESULT_ERROR_OUT_OF_RESOURCES` means too-large or piecewise graphs.
 - **Intel integrated GPUs and other unified-memory devices:** GPU memory is invisible to cgroups; see `methodology.md`. Battery and power profiles move results 8–10%.
-- **Apple silicon:** bandwidth-poor chips (base M-series) lose with deep speculation. The GPU wired-memory limit (`iogpu.wired_limit_mb`) caps usable memory.
+- **Apple silicon:** bandwidth-poor chips (base M-series) lose with deep speculation. The GPU wired-memory limit (`iogpu.wired_limit_mb`) caps usable memory. `queue.sh` uses Python's portable `fcntl.flock`, not the Linux-only `flock(1)` command. The bundled `mem.sh` currently targets Linux/containers; for a bare-metal Mac server, supply a `memory.probe` command that prints the process's real unified-memory footprint in bytes.
 - **NVIDIA Ampere has no FP8 units;** INT4 (AWQ/GPTQ/EXL) wins when bandwidth-bound.
 - **Hybrid GDN/SSM state dtype:** fp16 state produced `!!!` garbage on one SGLang XPU build, while another engine stored it in fp16 without issue. Verify output after changing the state dtype.

@@ -18,11 +18,12 @@ import json, sys
 
 
 def decode_ceiling(m, drafts, accept, ctx=0, n=1):
+    """Aggregate decode tok/s across n streams; draft weights are shared by the batch."""
     union = 1 - (1 - m["top_k"] / m["n_experts"]) ** ((drafts + 1) * n) if m.get("experts_gb") else 0
     verify = m["dense_gb"] + m["lm_head_gb"] + m.get("experts_gb", 0) * union
     verify += n * m.get("kv_bytes_per_token", 0) * ctx / 1e9 * (drafts + 1 if m.get("kv_per_verify_row") else 1)
-    draft = drafts * n * (m.get("draft_layer_gb", 0) + m.get("draft_head_gb", m["lm_head_gb"]))
-    return m["bandwidth_gbs"] / ((verify + draft) / (accept * n)) * n  # aggregate tok/s
+    draft = drafts * (m.get("draft_layer_gb", 0) + m.get("draft_head_gb", m["lm_head_gb"]))
+    return m["bandwidth_gbs"] / ((verify + draft) / (accept * n))  # one step emits accept * n tokens
 
 
 def prefill_ceiling(m, L):
