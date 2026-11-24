@@ -1,0 +1,19 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+[inkling] MLX_DSPARK_INKLING_FP16=1: cast 692 bf16 tensors to float16; activation dtype float16
+[inkling-fused] float16 self-test mask: max abs diff 0.000e+00 (limit 1.820e-02) ok
+[inkling-fused] float16 self-test sconv: max abs diff 0.000e+00 (limit 2.014e-01) ok
+[inkling-fused] float16 self-test layer: max abs diff 0.000e+00 (limit 3.805e-01) ok
+[inkling-fused] float16 self-test attn: max abs diff 0.000e+00 (limit 2.134e-01) ok
+[inkling-fused] float16 self-test kv: max abs diff 0.000e+00 (limit 5.125e-01) ok
+[inkling-fused] float16 self-test moe: max abs diff 0.000e+00 (limit 2.281e-01) ok
+[inkling-fused] float16 self-test res: max abs diff 1.192e-07 (limit 4.159e-03) ok
+[inkling-fused] float16 self-test ctrl: max abs diff 5.960e-07 (limit 1.315e-02) ok
+[inkling-fused] float16 self-test model: max abs diff 0.000e+00 (limit 1.463e-01) ok
+[inkling-fused] float16 self-test wide: max abs diff 0.000e+00 (limit 4.713e-01) ok
+candidate: 8-bit dense weights (env MLX_DSPARK_INKLING_DENSE_BITS=unset)
+reference (stock): positions 3063, mismatch rate 1.469%, near-ties 42, large-margin events 0
+candidate (8-bit): positions 3072, mismatch rate 1.074%, near-ties 31, large-margin events 0
+rate rule: PASS - rate 1.074% vs ref 1.469% (diff -0.39pp, one-sided 95% lower bound -0.87pp, z=-3.13) vs tolerance 0.50pp
+event rule: PASS - 0 large-margin events vs ref 0 (allowance 3.00 = 95% Poisson upper limit of the ref count at the candidate's exposure)
+VERDICT: PASS
+wrote gate.json
