@@ -13,7 +13,7 @@ It works under a memory cap, and every result has to survive a full-context stab
 It encodes how we actually got these speedups. It is not a list of flags. The workflow:
 
 1. Compute the theoretical ceiling.
-2. Change one thing at a time.
+2. Freeze a forecast, then change one thing (or a bundle you can attribute).
 3. Measure against interleaved controls.
 4. Log every result, including the failures.
 5. Gate on long-context retrieval.
@@ -96,7 +96,7 @@ The skill has three parts:
 
   It flags looping output, failed requests and runs on battery. Token counts come from server usage stats, never from streamed chunks, and everything lands in `ledger.jsonl`.
 - `ceiling.py` computes the theoretical ceilings from a JSON of measured bandwidth and FLOPs plus component sizes.
-- `queue.sh` is a serialized, detachable run queue, for interleaving control/candidate/control runs.
+- `queue.sh` is a serialized run queue for interleaving control/candidate/control runs; run it as a background task or service unit.
 - `mem.sh` reports a container's real footprint. That includes driver residency on unified-memory GPUs, which cgroups don't see.
 
 ## Install
@@ -129,7 +129,8 @@ python3 $S/scripts/bench.py show                                            # le
 
 ## Principles that carried the most weight
 
-- **Ceilings first.** If you don't know the maximum, you can't tell whether 53 tok/s is great or bad, or whether "100 tok/s" is possible.
+- **Ceilings first, per component.** If you don't know the maximum, you can't tell whether 53 tok/s is great or bad, or whether "100 tok/s" is possible.
+- **Forecast every arm, and test on real traffic.** A scored forecast shows where your model of the machine is wrong; the gap between a synthetic benchmark and real traffic names the bottleneck.
 - **Noise is ±5–10%.** Most single-run "wins" are drift. Interleave controls and use medians.
 - **Measure what matters:**
   - real tokens, not stream chunks;

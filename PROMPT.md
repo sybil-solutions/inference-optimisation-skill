@@ -23,15 +23,15 @@ You are optimising the serving speed of a local LLM on this machine. Use the `in
 ## How to manage the work
 
 1. **Set up and measure.**
-   - Set up the experiment directory: `PLAN.md`, `THEORY.md`, `configs/`, `ledger.jsonl`, `best-config.json`.
+   - Set up the experiment directory: `PLAN.md`, `THEORY.md`, `forecasts.jsonl`, `configs/`, `ledger.jsonl`, `best-config.json`.
    - Inventory the machine, and measure real bandwidth and matmul throughput.
    - Compute the ceilings with `scripts/ceiling.py` and write them to `THEORY.md`.
-   - Measure the baseline with `scripts/bench.py`.
+   - Measure the baseline with `scripts/bench.py`, and on the real workload if there is one.
 2. **Loop:**
    - Pick the lever with the biggest expected gain, using the lever order in `SKILL.md` and the evidence in `references/levers.md`.
-   - Make exactly one change in a new config.
+   - Freeze a forecast in `forecasts.jsonl` (value, band, mechanism, falsifier), then make one change in a new config, or a bundle whose levers each have a forecast and can be told apart by per-stage timing.
    - Run it between two controls with `scripts/queue.sh ctl cand ctl`.
-   - Accept or reject it, and log the numbers and the reason in `PLAN.md`.
+   - Score the forecast, accept or reject the change, and log the numbers and the reason in `PLAN.md`.
    - Never rerun something `PLAN.md` already rejected without a new reason.
 3. **Gate every new best:**
    - long-context needle retrieval at ~50%, then ~100% of the context;
@@ -39,11 +39,11 @@ You are optimising the serving speed of a local LLM on this machine. Use the `in
    - a greedy equivalence check for changes claimed to be lossless.
 4. **Safety, always:**
    - one GPU job at a time;
-   - an AC power and performance-profile guard;
+   - an AC power and performance-profile guard; on a shared host, the GPU plus a fixed core set booked and host load recorded per run;
    - the memory watchdog on;
    - drain requests before stopping a server, never force-kill mid-batch;
-   - detach long queues so they survive restarts.
-5. **Credentials:** if a sudo password or token is needed, ask once, through your harness's secret mechanism. Store it in a mode-600 file and never print it, commit it, or put its path in anything published.
+   - long queues run as harness background tasks or service-manager units, never `nohup`/`setsid`.
+5. **Credentials:** never prompt for, store, print or commit one, or put its path in anything published. Use what the environment already provides; if something is missing, stop and say what is needed.
 6. **Cadence:** if told "don't stop", keep looping. When three levers in a row land inside noise, write a STATUS/plateau section in `PLAN.md` and keep going at a slower cadence: profile, then try kernel-level levers. Otherwise, hand back at the plateau.
 7. **Afterwards:** restore the best server on its usual port, unless the user asked for the GPU to be freed.
 
@@ -63,7 +63,9 @@ Every report, whether progress or final, starts with this table:
 Then:
 
 - **What got the gains,** one line each, with the measured effect.
-- **What limits further gains,** with evidence: profile numbers, acceptance by depth, percentage of ceiling.
+- **What limits further gains,** with evidence: profile numbers, acceptance by depth, percentage of ceiling per component.
+- **Forecast calibration:** how many forecasts landed inside their bands, and what the misses taught.
+- **Contaminated runs,** if any, and what changed on the host.
 - **Known limitations,** e.g. decode stalls during a long prefill.
 - **System state you changed:**
   - power profile;

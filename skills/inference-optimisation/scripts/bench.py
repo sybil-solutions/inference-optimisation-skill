@@ -13,6 +13,7 @@ Config (JSON):
     "launch": ["docker", "run", "-d", "..."],      # optional; omit to benchmark an already-running server
     "stop":   ["docker", "stop", "-t", "60", "srv"],  # optional; run after a drain wait
     "health_timeout_s": 900,
+    "alive": ["sh", "-c", "docker top srv >/dev/null"],  # optional; exit 0 while the server process lives
     "concurrency": 4,                              # N for the cN test
     "prefill_lengths": [4096, 32768],              # approximate prompt tokens for cold prefill
     "extra_body": {"chat_template_kwargs": {"enable_thinking": false}},  # merged into every request
@@ -25,6 +26,8 @@ Measurements (all token counts come from the server's usage stats, never from st
   startup_s, ttft_short_ms, c1_decode (median of --reps), c1_all, cN_aggregate (wall clock), cN_per_stream,
   prefill_<L> (prompt_tokens / TTFT on a unique cold prompt), long-context needle retrieval (--long),
   mem_peak_gib, flags (LOOP, REQ_FAIL, ON_BATTERY, MEM_CAP). Results are appended to ledger.jsonl.
+The startup check blocks: the launch fails as soon as "alive" exits non-zero or health_timeout_s passes, logs
+progress every 30 s while waiting, and the run exits 1 whenever its result is not ok (so a queue or unit sees it).
 The server is left running after a run (the next run's launch stops it first); stop it yourself when done.
 """
 import json, os, random, statistics, string, subprocess, sys, threading, time, urllib.request
@@ -166,11 +169,28 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
         subprocess.run(cfg["launch"], check=True, capture_output=True)
         if watch:
             watch.start()
-        deadline = t0 + cfg.get("health_timeout_s", 900)
+        deadline, next_note = t0 + cfg.get("health_timeout_s", 900), t0 + 30
         while not srv.healthy():
-            if time.monotonic() > deadline or (watch and watch.tripped):
-                res.update(ok=False, error="server did not become healthy")
+            now = time.monotonic()
+            if now > deadline or (watch and watch.tripped):
+                res.update(ok=False, error=f"server did not become healthy in {now - t0:.0f} s")
+                stop_server()
                 return finish(res, flags, watch)
+            if cfg.get("alive"):
+                budget = min(cfg.get("alive_timeout_s", 10), max(1.0, deadline - now))
+                try:
+                    dead = subprocess.run(cfg["alive"], capture_output=True, timeout=budget).returncode != 0
+                    why = "liveness probe says the server exited"
+                except subprocess.TimeoutExpired:
+                    dead, why = False, None  # a slow probe is not a dead server; the deadline still applies
+                    log(f"liveness probe timed out after {budget:.0f} s; continuing until the deadline")
+                if dead:
+                    res.update(ok=False, error=f"{why} before becoming healthy ({now - t0:.0f} s)")
+                    stop_server()
+                    return finish(res, flags, watch)
+            if now >= next_note:
+                log(f"waiting for health: {now - t0:.0f} s of {cfg.get('health_timeout_s', 900)}")
+                next_note += 30
             time.sleep(1)
         res["startup_s"] = round(time.monotonic() - t0, 1)
         log("healthy after", res["startup_s"], "s")
@@ -259,4 +279,5 @@ if __name__ == "__main__":
         show(*(a[1:2]))
     else:
         opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
-        run(a[1], long_ctx=int(opt("--long")) if opt("--long") else None, skip_cn="--skip-cN" in a, reps=int(opt("--reps", 6)))
+        r = run(a[1], long_ctx=int(opt("--long")) if opt("--long") else None, skip_cn="--skip-cN" in a, reps=int(opt("--reps", 6)))
+        sys.exit(0 if r.get("ok") else 1)

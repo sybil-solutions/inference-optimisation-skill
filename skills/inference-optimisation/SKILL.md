@@ -2,165 +2,98 @@
 name: inference-optimisation
 description: >
   Hill-climb the serving speed of a local LLM on any hardware (NVIDIA, AMD, Intel,
-  Apple, unified-memory laptops, multi-GPU) and any quantization (GGUF, EXL2/EXL3,
-  AWQ/GPTQ, FP8, MLX, BF16): single-user and concurrent decode tok/s, speculative
-  decoding, prefill tok/s, KV cache size, startup time and TTFT, under a memory cap
-  and with full-context stability. Computes the theoretical ceiling first, runs
-  noise-controlled A/B experiments, keeps a ledger, and qualifies the winner before
-  publishing it. Use when asked to optimise, tune, speed up, benchmark or hill-climb
-  a model server (vLLM, SGLang, llama.cpp, ExLlama/TabbyAPI, MLX, TensorRT-LLM...),
-  to find the maximum possible tok/s on a machine, or to publish a tuned recipe.
-  Triggers: hill climb, tok/s, decode speed, prefill speed, MTP, EAGLE, draft model,
-  speculative decoding, KV cache, TTFT, startup time, theoretical maximum.
+  Apple, unified memory, multi-GPU, CPU offload) and quantization (GGUF, EXL2/EXL3,
+  AWQ/GPTQ, FP8, MLX, BF16): c1/cN decode, speculative decoding, prefill, KV size,
+  startup, TTFT, under a memory cap with full-context stability. Per-component
+  ceilings, a frozen forecast per arm, noise-controlled A/B on synthetic and real
+  traffic, a ledger, and qualification before publishing. Use when asked to optimise, tune, speed up,
+  benchmark or hill-climb a model server (vLLM, SGLang, llama.cpp, ExLlama/TabbyAPI,
+  MLX, TensorRT-LLM...), find the maximum tok/s on a machine, or publish a tuned
+  recipe. Triggers: hill climb, tok/s, decode/prefill speed, MTP, EAGLE, draft model,
+  speculative decoding, KV cache, TTFT, startup time, theoretical maximum, roofline.
 ---
 
 # Inference optimisation (hill-climbing a model server)
 
-You improve how fast a model server runs on one machine, with evidence.
-The loop is:
+You make a model server faster on one machine, with evidence:
 
-1. Measure the baseline.
-2. Calculate the ceiling.
-3. Change one thing.
-4. Measure it against controls.
-5. Keep it or reject it, and write down why.
-6. Repeat until the remaining gap needs work out of scope, then qualify and publish.
+1. Measure the baseline on a synthetic benchmark and on the real workload.
+2. Compute the ceiling per component.
+3. Freeze a forecast for the next arm.
+4. Run the arm against interleaved controls.
+5. Score the forecast, keep or reject, and write down why.
+6. Repeat until the gap needs out-of-scope work; then qualify and publish.
 
-Detailed references, read when needed:
-
-- `references/ceilings.md`: how to compute theoretical maxima. It includes a worked example.
-- `references/methodology.md`: measurement pitfalls and statistics.
-- `references/levers.md`: levers by area, ordered by typical payoff, with measured evidence.
-- `references/gotchas.md`: engine- and hardware-specific traps.
-- `references/publishing.md`: qualification gates, pinning, poster and report.
-- `scripts/`: an engine-agnostic harness. It has a bench, ceiling calculator, memory watchdog, serialized queue and ledger.
+References, read when needed: `references/ceilings.md` (maxima, per-component roofline, worked example), `methodology.md` (forecasts, counting, noise, shared hosts), `levers.md` (levers with measured evidence), `gotchas.md` (engine and hardware traps), `publishing.md` (gates, pinning, report). `scripts/`: bench, ceiling calculator, memory probe, serialized queue, ledger.
 
 ## 0. Before touching anything
 
-- **Write down the targets and constraints** the user gave. Ask only if one is missing and it changes what you do.
-  - Metrics that matter: c1 decode, cN decode, prefill at several lengths, TTFT, startup.
-  - Memory cap.
-  - Context length that must stay stable.
-  - Which quality changes are allowed: lossless only, or labelled lossy trades such as int8 prefill.
-- **Inventory the machine:**
-  - accelerator, memory type and size, and whether memory is unified;
-  - driver, engine version, model, quantization, current launch command.
-- **Measure, don't trust spec sheets:**
-  - real memory bandwidth (device copy);
-  - real matmul throughput (large GEMM);
-  - clocks under load.
-- **Read any existing experiment log for this machine and model.** Never rerun a rejected experiment without a new reason.
-- **Create the working directory:**
-  - `PLAN.md`: a timestamped log of every experiment, with numbers, verdict and reason.
-  - `THEORY.md`: the ceilings.
-  - `ledger.jsonl`: one line per run, from the harness.
-  - `configs/`: one JSON per run.
-  - `best-config.json`.
+- **Write down targets and constraints;** ask only if a missing one changes what you do. Metrics: c1 and cN decode, prefill at several lengths, TTFT, startup, and the real workload's own rate (e.g. agent tasks per hour). Memory cap, context that must stay stable, allowed quality trades (lossless only, or labelled lossy ones such as int8 prefill).
+- **Inventory:** accelerator, memory (type, size, unified?), CPU cores and NUMA, driver, engine version, model, quant, launch command, who else uses the host.
+- **Measure, don't trust spec sheets:** copy bandwidth, a large GEMM, clocks under load.
+- **Read existing logs and forecasts** for this machine and model. Never rerun a rejected experiment without a new reason.
+- **Working directory:** `PLAN.md` (timestamped: forecast, numbers, verdict, reason), `THEORY.md`, `forecasts.jsonl`, `ledger.jsonl`, `configs/` (one JSON per run), `best-config.json`.
 
 ## 1. Ceilings first
 
-Compute the theoretical maximum for each metric before optimising (`scripts/ceiling.py`, `references/ceilings.md`):
+Before optimising, compute (`scripts/ceiling.py`, `references/ceilings.md`):
 
-- **Decode is memory-bandwidth bound.** Count the bytes read per emitted token:
-  - dense weights;
-  - active experts: top-k ÷ experts × expert bytes;
-  - LM head;
-  - KV read at the working context.
-  - Divide by measured bandwidth.
-  - Speculative decoding divides the target's bytes by the accepted length. It also adds the draft's bytes, and the draft's LM head is often the biggest part.
-- **Prefill is compute bound.** FLOPs per token ≈ 2 × active params, plus attention at about 4 × layers × hidden × position. Divide by ~50% of measured peak for a practical ceiling.
-- **TTFT floor:** one forward pass plus tokenize and schedule.
-- **Startup floor:** weight read from disk or page cache plus allocation, assuming JIT and graph caches persist.
-- **KV:** bytes per token per layer × the layers that actually have KV (hybrid models have few). That gives how many full-length sequences fit under the memory cap.
+- **Decode** is bandwidth bound: bytes per emitted token (dense, active experts, LM head, KV) ÷ measured bandwidth; speculation divides target bytes by accepted length and adds the draft's.
+- **Prefill** is compute bound: FLOPs per token at ~50% of measured peak. Also TTFT, startup and KV floors.
+- **Batched serving gets a roofline per component** (dense, experts, attention, state, LM head, sampler, host) from bytes and FLOPs per row at real context lengths, with percent of ceiling per component: a total hides which part is far from its floor, and batching amortizes shared bytes, not per-row FLOPs.
 
-Report progress as a percentage of the practical ceiling. If the user's target is above the ceiling, say so early, with the arithmetic.
+Report progress as percent of the practical ceiling. If the target is above it, say so early, with the arithmetic.
 
 ## 2. Ground rules (non-negotiable)
 
-1. **One change per experiment.** Give each its own config file. Derive new configs from the current best.
-2. **Control for noise.** Run-to-run noise is typically ±5–10%.
-   - Take ≥6 decode samples per run and use the median.
-   - Run controls on both sides of each candidate: control, candidate, control.
-   - Accept only if the candidate beats both neighbouring controls on its target metric and regresses nothing by more than ~3%.
-   - Repeat any single surprising win.
-3. **Keep the environment fixed.** Stay on AC power, on a fixed performance profile, with an idle host and no other GPU jobs.
-   - Make the harness refuse to run otherwise.
-   - Record the state at the end of each run, and void the run if it changed.
-   - Restore any profile you changed when you finish, and tell the user.
-4. **Run one GPU job at a time.** Serialize them with a lock (`scripts/queue.sh`).
-   - Never use `pkill -f`/`pgrep -f` patterns that can match your own shell.
-   - Detach long queues (`setsid nohup … &`) so they survive agent restarts.
-5. **Enforce the memory cap with a watchdog** that kills the run.
-   - On unified memory, GPU allocations do not show in cgroup counters or MemAvailable. Measure driver residency (e.g. `drm-resident-*` in `/proc/<pid>/fdinfo`, `nvidia-smi`, or `ioreg`/`vm_stat` on Apple) plus process anonymous memory.
-6. **Stability gates.** A config is only "best" after it passes:
-   - a long-context retrieval run, with needles in a ~50% then ~100% context document, found exactly;
-   - a soak with concurrent full-length requests, if the KV pool is sized for N users;
-   - a greedy output equivalence check, if the change claims to be lossless.
-7. **Never force-kill a server mid-batch.** Abort requests, wait for the drain, then stop with a timeout. A forced stop mid-prefill has caused GPU driver faults.
-8. **Verify outputs, not just speed.** Flag degenerate or looping output, failed requests and an idle GPU. A suspiciously fast result is usually broken output.
-9. **Log everything in `PLAN.md`,** including failures and why they failed. Negative results are the most reusable output.
-10. **Secrets:** never ask twice for a credential the user already saved. Never print it, and never copy it or its path into anything published.
+1. **Forecast before every arm** in `forecasts.jsonl`: metric, value with band, mechanism, falsifier. Score it after; keep the calibration (N of M inside) in `PLAN.md`. A miss is information about your model of the machine, not just the config: find the wrong term before the next arm.
+2. **Size arms by attribution.** Bundle levers in one arm when each has its own frozen forecast and per-stage timing (profiler, engine stage stamps) can attribute the gain; confirm against interleaved controls. Change one thing at a time only when attribution is unclear, or to split a bundle that missed. Derive configs from the current best.
+3. **Control for noise** (typically ±5–10%): ≥6 decode samples, median; control, candidate, control. Accept only if the candidate beats both neighbours and regresses nothing by >~3%. Repeat surprising wins.
+4. **Fix the environment, or record it.** AC power and a fixed performance profile, enforced by the harness; restore what you changed, and say so. On a shared host, book the accelerator plus a fixed core set, record host load through each run, and mark a run CONTAMINATED from when load changed, keeping the clean span.
+5. **One accelerator job at a time,** under a lock (`scripts/queue.sh`). Kill by PID, never with `pkill -f`/`pgrep -f` patterns that can match your own shell.
+6. **Every launch has a blocking startup check:** wait for health with a deadline, log progress, exit non-zero on failure. Failing fast needs a time-limited liveness probe on the serving process itself (container state only sees the container exit). A server that never came up fails the launch; it never leaves a queue waiting silently.
+7. **Long jobs run as harness background tasks or service-manager units** (`systemd-run --user`, launchd): logged, visible, stoppable. Never `nohup`, `setsid` or `& disown`.
+8. **Memory cap watchdog** that kills the run; on unified memory count driver residency plus anon (`methodology.md`).
+9. **Stability gates** before "best": needles at ~50% then ~100% context, found exactly; a concurrent full-length soak if KV is sized for N users; greedy equivalence if the change claims to be lossless.
+10. **Never force-kill a server mid-batch.** Abort, drain, stop with a timeout; a forced stop mid-prefill has caused GPU driver faults.
+11. **Verify outputs, not just speed:** flag looping output, failed requests, an idle GPU. A suspiciously fast result is usually broken.
+12. **Log everything in `PLAN.md`,** failures included; negative results are the most reusable output.
+13. **Credentials:** never prompt for, store, print or publish one. Use what the environment provides (credential helper, environment variable); if one is missing, stop and say what is needed.
 
 ## 3. The loop
 
 ```
-baseline → profile → pick the lever with the largest (ceiling gap × likelihood) → config → A/B with controls
-   ↑                                                                                         ↓
-   └──────── update best-config + PLAN.md + ledger ←──── accept / reject with reason ←───────┘
+baseline → per-component ceiling → pick levers (gap × likelihood) → freeze forecast → arm vs controls
+   ↑                                                                                       ↓
+   └──── update best-config + PLAN.md + ledger ←──── score forecast, accept / reject ←─────┘
 ```
+
+**Synthetic vs real.** A synthetic run is the perfect-world ceiling probe; the real workload (agent sessions, their prompt mix) is the truth, and the gap between them names the bottleneck: real agents send long prompts mid-decode, so mixed prefill+decode steps, rare in synthetic runs, can dominate wall time. Keep a lever only if it holds on real traffic.
 
 ### Lever order
 
-Cheapest first; see `references/levers.md` for evidence.
+Cheapest first; evidence in `levers.md`.
 
-1. **Persistent JIT, compile and graph caches** (startup −50–70%). Also use eager safetensors loading instead of mmap where it is slow.
-2. **Decode graphs** (CUDA/XPU graphs): often 2× c1 on their own.
-3. **Speculative decoding:**
-   - Choose the method (built-in MTP, EAGLE, a draft model, n-gram).
-   - Sweep draft length per concurrency and context; the best length differs.
-   - Prune the draft LM head's vocabulary.
-   - Keep sampling on the GPU.
-   - Make sure verify runs with decode-style attention.
-4. **Concurrency and KV sizing:**
-   - Set max running requests and the KV pool to N × context.
-   - For hybrid SSM/GDN models, size the state slots. They, not KV, often cap concurrency.
-   - Explicitly enable prefix caching and confirm `cached_tokens` > 0.
-5. **Prefill:**
-   - Tune chunk size; it trades throughput against decode stalls.
-   - Use a faster attention library.
-   - Use int8/fp8 prefill GEMMs as a labelled quality trade.
-   - Avoid padding cliffs in grouped MoE GEMMs.
-6. **Kernel thread and tile sizes:** defaults are often tuned for a bigger card.
-7. **Kernel work:** profile, read the ISA, fix the dominant kernel. Do this only after config levers plateau.
+1. **Persistent JIT/compile/graph caches** (startup −50–70%); eager loading where mmap is slow.
+2. **Decode graphs:** often 2× c1 alone.
+3. **Speculative decoding:** method; draft length per concurrency and context; pruned draft LM head; GPU sampling; decode-style verify.
+4. **Concurrency and KV:** N × context pool, hybrid state slots, prefix caching (`cached_tokens` > 0).
+5. **Prefill and scheduling:** chunk size, where prompts run beside decode, faster attention, int8/fp8 prefill GEMMs (labelled), no MoE padding cliffs.
+6. **Host path:** copies, syncs, samplers on the critical path; threads and NUMA for CPU tiers.
+7. **Kernel thread and tile sizes:** defaults suit a bigger card.
+8. **Kernel work** after config levers plateau: profile, read the ISA, fix the dominant kernel.
 
-### When a lever fails
+**When a lever fails:** fusion gives nothing under graphs → time is inside the big kernels; stop fusing. Higher acceptance without higher tok/s → the draft costs too much, measure per-step time. A weird result → suspect the measurement (chunk-counted tokens, prompt length not from the real tokenizer, cache hits, thermals, battery, host load).
 
-- **If kernel-count reductions (fusion) give nothing** under graphs, the time is inside the main kernels. Stop fusing.
-- **If higher acceptance doesn't give higher tok/s,** the draft costs too much. Measure per-step time.
-- **If a weird result appears,** suspect the measurement first: tokens counted per streamed chunk, prompt length not measured with the real tokenizer, cache hits, thermal state, or the battery.
-
-### Plateau
-
-Declare a plateau when three consecutive levers land inside noise. Write a STATUS section in `PLAN.md` with:
-
-- best numbers vs baseline vs ceiling;
-- what limits further gains, with evidence;
-- a ranked list of the remaining levers and their estimated cost.
-
-Then keep the loop alive at a slower cadence if the user said "don't stop", or hand back.
+**Plateau:** three levers in a row inside noise. Write a STATUS section in `PLAN.md`: best vs baseline vs ceiling per component, what limits further gains with evidence, forecast calibration, remaining levers ranked with cost. Keep looping slower if told "don't stop", else hand back.
 
 ## 4. Qualify and publish
 
-See `references/publishing.md`.
-
-- Pin weights by revision, engine by image digest or source commit, and kernels by commit. Build the published artifact from those pins in a clean checkout, never from a dirty tree.
-- Run the acceptance gates on the clean build: load, chat, reasoning, tools round-trip, a long-context needle, and speed.
-- Then A/B the clean build against your best image to prove they match.
-- Report which numbers come from which harness. Gate numbers (e.g. thinking on, first 30 s) and hill-climb numbers (thinking off, medians) are not comparable.
+See `publishing.md`: pin weights, engine and kernels; build clean from the pins; run the acceptance gates (load, chat, reasoning, tools, needle, speed); A/B the clean build against your best. Gate and hill-climb numbers are not comparable; say which is which.
 
 ## 5. Reporting to the user
 
-- **Start with a table:** metric, baseline, now, ceiling, how it was measured (median of N, cold or warm, which harness).
-- **Then:** what got the gains, why it stops here, the known limitations, and the system state you changed (power profile, running servers, uncommitted code, branches that must not be deleted).
+- **Start with a table:** metric | baseline | now | ceiling | how measured (median of N, cold or warm, harness, synthetic or real). Add percent of ceiling per component and forecast calibration.
+- **Then:** what got the gains, why it stops here, known limitations, contaminated runs, and the system state you changed (power profile, running servers and units, uncommitted code, branches that must stay).
 - **Say plainly** what was not verified.
-- **When asked to free the GPU:** drain, stop the server, confirm no processes and an idle clock, and end any loop.
+- **To free the GPU:** drain, stop the server, confirm no processes and an idle clock, end any loop or unit.
