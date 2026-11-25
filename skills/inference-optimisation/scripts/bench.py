@@ -124,7 +124,14 @@ def on_ac():
         if sys.platform == "darwin":
             return "AC Power" in subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True).stdout
         import glob
-        vals = [open(p).read().strip() for p in glob.glob("/sys/class/power_supply/*/online")]
+
+        def rd(d, f):
+            p = os.path.join(d, f)
+            return open(p).read().strip() if os.path.exists(p) else ""
+        # Only power adapters say whether the machine is on mains. A peripheral's battery (wireless mouse,
+        # keyboard: scope=Device, online=0) is not one: a desktop with a wireless mouse read as ON_BATTERY.
+        vals = [rd(d, "online") for d in glob.glob("/sys/class/power_supply/*")
+                if rd(d, "scope") != "Device" and rd(d, "type") != "Battery" and rd(d, "online")]
         return not vals or "1" in vals
     except Exception:
         return True
