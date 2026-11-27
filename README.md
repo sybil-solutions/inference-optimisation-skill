@@ -1,5 +1,7 @@
 # inference-optimisation
 
+> Tiếng Việt: [README.vi.md](README.vi.md)
+
 An agent skill for **hill-climbing the speed of a local LLM server** on any hardware and any quantization. It covers:
 
 - single-user and concurrent decode
