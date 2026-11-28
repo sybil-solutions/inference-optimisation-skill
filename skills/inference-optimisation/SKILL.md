@@ -88,6 +88,7 @@ Report progress as a percentage of the practical ceiling. If the user's target i
    - Record the state at the end of each run, and void the run if it changed.
    - Restore any profile you changed when you finish, and tell the user.
 4. **Run one GPU job at a time.** Serialize them with a lock (`scripts/queue.sh`).
+   - Identify any existing GPU workload from its container labels or process owner before launching. Leave other workloads running and use `QUEUE_LOCK` to share the host's agreed lock.
    - Never use `pkill -f`/`pgrep -f` patterns that can match your own shell.
    - Detach long queues (`setsid nohup … &`) so they survive agent restarts.
 5. **Enforce the memory cap with a watchdog** that kills the run.
@@ -98,6 +99,7 @@ Report progress as a percentage of the practical ceiling. If the user's target i
    - a greedy output equivalence check, if the change claims to be lossless.
 7. **Never force-kill a server mid-batch.** Abort requests, wait for the drain, then stop with a timeout. A forced stop mid-prefill has caused GPU driver faults.
 8. **Verify outputs, not just speed.** Flag degenerate or looping output, failed requests and an idle GPU. A suspiciously fast result is usually broken output.
+   - Use prompts with a natural stopping point. Require a stop finish and server token usage for speed measurements.
 9. **Log everything in `PLAN.md`,** including failures and why they failed. Negative results are the most reusable output.
 10. **Secrets:** never ask twice for a credential the user already saved. Never print it, and never copy it or its path into anything published.
 
