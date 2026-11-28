@@ -24,7 +24,8 @@ Config (JSON):
 Measurements (all token counts come from the server's usage stats, never from streamed chunks):
   startup_s, ttft_short_ms, c1_decode (median of --reps), c1_all, cN_aggregate (wall clock), cN_per_stream,
   prefill_<L> (prompt_tokens / TTFT on a unique cold prompt), long-context needle retrieval (--long),
-  mem_peak_gib, flags (LOOP, REQ_FAIL, ON_BATTERY, MEM_CAP). Results are appended to ledger.jsonl.
+  mem_peak_gib, flags (LOOP, REQ_FAIL, RETRIEVAL_FAIL, ON_BATTERY, MEM_CAP).
+  Results are appended to ledger.jsonl. Failed runs exit nonzero.
 The server is left running after a run (the next run's launch stops it first); stop it yourself when done.
 """
 import json, os, random, statistics, string, subprocess, sys, threading, time, urllib.request
@@ -61,15 +62,18 @@ class Server:
         except Exception:
             return False
 
-    def chat(self, prompt, max_tokens, temperature=None, timeout=7200):
+    def chat(self, prompt, temperature=None, timeout=7200):
         """Stream one chat completion. Returns ttft, decode tok/s, prompt/completion tokens (server usage)."""
         body = {"model": self.cfg["model"], "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens, "stream": True, "stream_options": {"include_usage": True},
+                "stream": True, "stream_options": {"include_usage": True},
                 "temperature": self.cfg.get("temperature", 0.6) if temperature is None else temperature}
         body.update(self.cfg.get("extra_body", {}))
+        for key in ("max_tokens", "max_completion_tokens", "max_new_tokens"):
+            if key in body:
+                raise ValueError(f"{key} caps benchmark output")
         req = urllib.request.Request(self.base + "/v1/chat/completions", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
-        t0 = time.monotonic(); t_first = None; text = []; usage = {}
+        t0 = time.monotonic(); t_first = None; text = []; answer = []; usage = {}; finish_reason = None
         with urllib.request.urlopen(req, timeout=timeout) as r:
             for raw in r:
                 line = raw.decode("utf-8", "replace").strip()
@@ -82,19 +86,23 @@ class Server:
                 if ev.get("usage"):
                     usage = ev["usage"]
                 for ch in ev.get("choices") or []:
+                    finish_reason = ch.get("finish_reason") or finish_reason
                     d = ch.get("delta") or {}
-                    piece = (d.get("content") or "") + (d.get("reasoning_content") or d.get("reasoning") or "")
+                    content = d.get("content") or ""
+                    piece = content + (d.get("reasoning_content") or d.get("reasoning") or "")
                     if piece:
                         if t_first is None:
                             t_first = time.monotonic()
                         text.append(piece)
+                    if content:
+                        answer.append(content)
         t_end = time.monotonic()
         ct, pt = usage.get("completion_tokens"), usage.get("prompt_tokens")
-        if t_first is None:
-            t_first = t_end
+        if finish_reason != "stop" or t_first is None or not ct or not pt:
+            raise ValueError(f"completion missing natural stop, text or token usage (finish_reason={finish_reason!r})")
         decode = (ct - 1) / (t_end - t_first) if ct and ct > 1 and t_end > t_first else None
         return {"ttft": t_first - t0, "decode": decode, "completion_tokens": ct, "prompt_tokens": pt,
-                "wall": t_end - t0, "t0": t0, "t_end": t_end, "text": "".join(text)}
+                "wall": t_end - t0, "t0": t0, "t_end": t_end, "text": "".join(text), "answer": "".join(answer)}
 
 
 def looping(text, n=8, thresh=0.5):
@@ -115,7 +123,8 @@ def document(tokens, seed, needles=3):
         pos = int(n_words * (i + 1) / (needles + 1))
         words.insert(pos, f". The secret code number {i + 1} is {c}. ")
     head = f"[doc {seed}-{time.time_ns()}] "  # defeats prefix caching
-    q = "\n\nList every secret code number and its value that appears in the document above. Answer only with the codes."
+    q = ("\n\nList every secret code number and its value that appears in the document above. Answer only with the codes."
+         if needles else "\n\nReply with the single word: ready.")
     return head + " ".join(words) + q, codes
 
 
@@ -157,13 +166,13 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
 
     def stop_server():
         if cfg.get("stop"):
-            subprocess.run(cfg["stop"], capture_output=True)
+            subprocess.run(cfg["stop"], capture_output=True, timeout=cfg.get("stop_timeout_s", 90))
 
     watch = MemWatch(cfg["memory"], stop_server) if cfg.get("memory", {}).get("probe") else None
     if cfg.get("launch"):
         stop_server()
         t0 = time.monotonic()
-        subprocess.run(cfg["launch"], check=True, capture_output=True)
+        subprocess.run(cfg["launch"], check=True, capture_output=True, timeout=cfg.get("launch_timeout_s", 900))
         if watch:
             watch.start()
         deadline = t0 + cfg.get("health_timeout_s", 900)
@@ -180,13 +189,13 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
         if watch:
             watch.start()
     try:
-        srv.chat("Say hello.", 16)  # warm-up (not measured)
-        r = srv.chat("Reply with the single word: ready", 8)
+        srv.chat("Say hello in one sentence.")  # warm-up (not measured)
+        r = srv.chat("Reply with the single word: ready")
         res["ttft_short_ms"] = round(r["ttft"] * 1000, 1)
 
         c1 = []
         for i in range(reps):
-            r = srv.chat(PROMPTS[i % len(PROMPTS)], 512)
+            r = srv.chat(PROMPTS[i % len(PROMPTS)])
             if r["decode"]:
                 c1.append(round(r["decode"], 2))
             if looping(r["text"]):
@@ -198,7 +207,9 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
         n = int(cfg.get("concurrency", 4))
         if n > 1 and not skip_cn:
             with ThreadPoolExecutor(n) as ex:
-                rs = list(ex.map(lambda i: srv.chat(PROMPTS[i % len(PROMPTS)], 512), range(n)))
+                rs = list(ex.map(lambda i: srv.chat(PROMPTS[i % len(PROMPTS)]), range(n)))
+            if any(looping(x["text"]) for x in rs):
+                flags.append("LOOP")
             toks = sum((x["completion_tokens"] or 0) for x in rs)
             wall = max(x["t_end"] for x in rs) - min(x["t0"] for x in rs)
             res[f"c{n}_aggregate"] = round(toks / wall, 2)
@@ -206,21 +217,24 @@ def run(cfg_path, long_ctx=None, skip_cn=False, reps=6):
             log(f"c{n} aggregate", res[f"c{n}_aggregate"])
 
         for L in cfg.get("prefill_lengths", [4096, 32768]):
-            prompt, _ = document(L, seed=L)
-            r = srv.chat(prompt, 1, temperature=0.0)
+            prompt, _ = document(L, seed=L, needles=0)
+            r = srv.chat(prompt, temperature=0.0)
             res[f"prefill_{L}"] = round(r["prompt_tokens"] / r["ttft"], 1) if r["prompt_tokens"] else None
             res[f"prefill_{L}_tokens"] = r["prompt_tokens"]
             log(f"prefill ~{L}", res[f"prefill_{L}"], "tok/s over", r["prompt_tokens"], "tokens")
 
         if long_ctx:
             prompt, codes = document(long_ctx, seed=7)
-            r = srv.chat(prompt, 256, temperature=0.0)
+            r = srv.chat(prompt, temperature=0.0)
+            found = sum(c in r["answer"] for c in codes)
             res["long"] = {"prompt_tokens": r["prompt_tokens"], "ttft_s": round(r["ttft"], 1),
                            "prefill": round(r["prompt_tokens"] / r["ttft"], 1) if r["prompt_tokens"] else None,
                            "decode": r["decode"] and round(r["decode"], 2),
-                           "retrieval": f"{sum(c in r['text'] for c in codes)}/{len(codes)}"}
+                           "retrieval": f"{found}/{len(codes)}"}
             log("long", res["long"])
-        res["ok"] = True
+            if found != len(codes):
+                flags.append("RETRIEVAL_FAIL")
+        res["ok"] = not flags and bool(c1)
     except Exception as e:
         res.update(ok=False, error=repr(e)); flags.append("REQ_FAIL")
     return finish(res, flags, watch)
@@ -259,4 +273,6 @@ if __name__ == "__main__":
         show(*(a[1:2]))
     else:
         opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
-        run(a[1], long_ctx=int(opt("--long")) if opt("--long") else None, skip_cn="--skip-cN" in a, reps=int(opt("--reps", 6)))
+        result = run(a[1], long_ctx=int(opt("--long")) if opt("--long") else None,
+                     skip_cn="--skip-cN" in a, reps=int(opt("--reps", 6)))
+        sys.exit(0 if result["ok"] else 1)
