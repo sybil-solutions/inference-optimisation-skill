@@ -11,6 +11,8 @@ These were found the hard way. Versions matter; re-check on newer releases.
 - **Gateway or proxy timeouts** (often 600 s) cut off long-context tests. Test against the engine directly. Retry only on dropped connections, never on timeouts.
 - **Shells and agents:** `pkill -f pattern` can kill the shell that runs it, and `pgrep -f` can wait on itself. Kill by PID.
 - **Agent restarts** kill child processes. Detach long jobs (`setsid nohup … & disown`) and make them resumable.
+- **Wait for free memory between configs, not for the engine to report the model unloaded.** `/api/ps` empties first, so the next load races the allocator and dies like a capacity wall — 22 743 MiB free, previous sample 1 656.
+- **A model with a draft or MTP head cannot be a bandwidth control.** It decodes several tokens per forward pass: two 27 B Q4_K_M checkpoints hit 91.7 and 71.9 tok/s against a 47.6 tok/s dense ceiling. Check `mtp` / `nextn_predict_layers` first.
 
 ## vLLM
 
@@ -55,4 +57,5 @@ These were found the hard way. Versions matter; re-check on newer releases.
 - **Intel integrated GPUs and other unified-memory devices:** GPU memory is invisible to cgroups; see `methodology.md`. Battery and power profiles move results 8–10%.
 - **Apple silicon:** bandwidth-poor chips (base M-series) lose with deep speculation. The GPU wired-memory limit (`iogpu.wired_limit_mb`) caps usable memory.
 - **NVIDIA Ampere has no FP8 units;** INT4 (AWQ/GPTQ/EXL) wins when bandwidth-bound.
+- **A dtype the target has no units for is a dequant cost, not a bandwidth saving.** 61.7 % NVFP4 on an sm_86 card that decodes no FP4 ran decode at 15 % of the bandwidth ceiling with the bus ~70 % idle.
 - **Hybrid GDN/SSM state dtype:** fp16 state produced `!!!` garbage on one SGLang XPU build, while another engine stored it in fp16 without issue. Verify output after changing the state dtype.
