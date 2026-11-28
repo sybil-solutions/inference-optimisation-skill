@@ -53,3 +53,4 @@ Most "wins" and "regressions" in inference tuning are measurement errors. In eve
 - Profile prefill by stage (GEMM, attention, MoE, linear attention, norms/Hadamards) before picking the next lever.
 - Debug builds that remove work (e.g. skipping dequantization) change code generation, so they are not valid lower bounds.
 - Read the ISA or assembly when a kernel is "at the limit". Register-region moves, spills and serialized tails hide there.
+- **A wall clock near the ceiling does not confirm it.** 16.7 ms/token matched 13.6 GB ÷ 845 GB/s to 4 %, but memory utilisation read 30 % at 92 % GPU and 232 W against 306 W for prefill. Prefer DRAM byte counters over utilisation.
